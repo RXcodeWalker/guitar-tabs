@@ -20,6 +20,12 @@ class FretboardVisualizer {
         // Active lit notes: Map of `${string}-${fret}` => { noteName, finger, timestamp, intensity, color }
         this.activeNotes = new Map();
 
+        // Scale Overlay State (Target, Passing, and Avoid notes)
+        this.scaleOverlayNotes = [];
+        this.scaleOverlayVisible = true;
+        this.scaleOverlayMode = 'noteName'; // 'noteName' or 'interval'
+        this.scaleOverlayShowAvoid = false;
+
         // String vibration physics: array of { amplitude, frequency, phase, decay }
         this.stringVibrations = Array.from({ length: 6 }, () => ({
             amplitude: 0,
@@ -218,6 +224,25 @@ class FretboardVisualizer {
     }
 
     /**
+     * Sets live fretboard scale overlay notes and rendering options.
+     * @param {Array<object>} notes - Array of {string, fret, noteType, noteName, interval}
+     * @param {object} options - { visible, mode, showAvoid }
+     */
+    setScaleOverlay(notes, options = {}) {
+        this.scaleOverlayNotes = notes || [];
+        if (options.visible !== undefined) this.scaleOverlayVisible = options.visible;
+        if (options.mode !== undefined) this.scaleOverlayMode = options.mode;
+        if (options.showAvoid !== undefined) this.scaleOverlayShowAvoid = options.showAvoid;
+    }
+
+    /**
+     * Clears active scale overlay.
+     */
+    clearScaleOverlay() {
+        this.scaleOverlayNotes = [];
+    }
+
+    /**
      * Continuous 60fps render loop for smooth string vibration and badge glow animations.
      */
     startRenderLoop() {
@@ -246,6 +271,11 @@ class FretboardVisualizer {
 
         // 5. Draw Open String & Tuning Labels
         this.drawStringLabels(ctx);
+
+        // 5.5 Draw Live Scale Overlay Badges (Target, Passing, Avoid)
+        if (this.scaleOverlayVisible && this.scaleOverlayNotes && this.scaleOverlayNotes.length > 0) {
+            this.drawScaleOverlay(ctx);
+        }
 
         // 6. Draw Glowing Neon Active Note Badges
         this.drawActiveBadges(ctx);
@@ -576,6 +606,124 @@ class FretboardVisualizer {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText('0', fX, fY);
+        }
+
+        ctx.restore();
+    }
+
+    /**
+     * Draws the full fretboard scale overlay (Target, Passing, and Avoid notes).
+     */
+    drawScaleOverlay(ctx) {
+        if (!this.scaleOverlayNotes || this.scaleOverlayNotes.length === 0) return;
+
+        ctx.save();
+        for (let i = 0; i < this.scaleOverlayNotes.length; i++) {
+            const item = this.scaleOverlayNotes[i];
+            if (item.noteType === 'avoid' && !this.scaleOverlayShowAvoid) {
+                continue;
+            }
+
+            const strIdx = item.string - 1;
+            if (strIdx < 0 || strIdx >= this.numStrings) continue;
+            const baseY = this.stringY[strIdx];
+
+            let badgeX;
+            if (item.fret === 0) {
+                badgeX = this.neckMarginLeft - 26;
+            } else {
+                const prevX = this.fretPositions[item.fret - 1];
+                const currX = this.fretPositions[item.fret];
+                badgeX = (prevX + currX) / 2;
+            }
+
+            const label = (this.scaleOverlayMode === 'interval') ? item.interval : item.noteName;
+            this.renderScaleOverlayBadge(ctx, badgeX, baseY, label, item.noteType, item.interval);
+        }
+        ctx.restore();
+    }
+
+    /**
+     * Renders an individual scale overlay badge with specialized visual styles for:
+     * - "target": Chord Tones (Root, 3rd, 5th, 7th)
+     * - "passing": Safe Extensions and Pentatonic steps
+     * - "avoid": Clashing half-step intervals
+     */
+    renderScaleOverlayBadge(ctx, x, y, label, noteType, interval) {
+        ctx.save();
+
+        if (noteType === 'target') {
+            const isRoot = (interval === 'R' || interval === '1');
+            const radius = isRoot ? 12.0 : 10.5;
+
+            // Outer Bloom / Glow
+            ctx.shadowColor = isRoot ? '#ffd166' : '#00f3ff';
+            ctx.shadowBlur = isRoot ? 12 : 8;
+
+            // Background fill
+            ctx.fillStyle = isRoot ? 'rgba(35, 28, 12, 0.90)' : 'rgba(10, 24, 38, 0.88)';
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Border
+            ctx.strokeStyle = isRoot ? '#ffd166' : '#00f3ff';
+            ctx.lineWidth = isRoot ? 2.4 : 1.8;
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Label
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = isRoot ? '#fff275' : '#ffffff';
+            ctx.font = isRoot ? 'bold 10.5px "Inter", sans-serif' : 'bold 9.5px "Inter", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(label || '', x, y);
+
+        } else if (noteType === 'passing') {
+            const radius = 8.5;
+
+            ctx.shadowColor = '#10b981';
+            ctx.shadowBlur = 4;
+
+            ctx.fillStyle = 'rgba(6, 32, 22, 0.85)';
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = '#10b981';
+            ctx.lineWidth = 1.3;
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#6ee7b7';
+            ctx.font = 'bold 8.5px "Inter", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(label || '', x, y);
+
+        } else if (noteType === 'avoid') {
+            const radius = 7.0;
+
+            ctx.fillStyle = 'rgba(40, 10, 15, 0.80)';
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = 'rgba(239, 68, 68, 0.65)';
+            ctx.lineWidth = 1.0;
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.fillStyle = '#fca5a5';
+            ctx.font = '7.5px "Inter", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(label || '', x, y);
         }
 
         ctx.restore();

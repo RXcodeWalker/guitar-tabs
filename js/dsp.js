@@ -38,9 +38,12 @@ class GuitarDSP {
         this.onSilence = options.onSilence || null;
         this.onWaveformData = options.onWaveformData || null;
         this.onAudioMetrics = options.onAudioMetrics || null;
+        this.onChromaData = options.onChromaData || null;
 
-        // Buffers
+        // Buffers & FFT Settings
+        this.fftSize = options.fftSize || 8192; // 8192 fftSize yields 4096 frequency bins
         this.timeDomainBuffer = new Float32Array(this.bufferSize);
+        this.freqByteData = null;
 
         // Note names lookup table
         this.noteStrings = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
@@ -103,10 +106,11 @@ class GuitarDSP {
 
             this.sourceNode = this.audioCtx.createMediaStreamSource(this.micStream);
             
-            // Analyser node for time-domain and frequency extraction
+            // Analyser node for time-domain and frequency extraction (4096 bins via fftSize 8192)
             this.analyser = this.audioCtx.createAnalyser();
-            this.analyser.fftSize = this.bufferSize * 2;
+            this.analyser.fftSize = this.fftSize;
             this.analyser.smoothingTimeConstant = 0.0;
+            this.freqByteData = new Uint8Array(this.analyser.frequencyBinCount);
             
             // 1. Split signal routing: send raw/unprocessed audio to pitch detection analyser
             // DSP effects do not alter or degrade pitch tracking accuracy
@@ -167,6 +171,14 @@ class GuitarDSP {
 
             if (this.onWaveformData) {
                 this.onWaveformData(this.timeDomainBuffer);
+            }
+
+            if (this.onChromaData) {
+                if (!this.freqByteData || this.freqByteData.length !== this.analyser.frequencyBinCount) {
+                    this.freqByteData = new Uint8Array(this.analyser.frequencyBinCount);
+                }
+                this.analyser.getByteFrequencyData(this.freqByteData);
+                this.onChromaData(this.freqByteData, this.sampleRate);
             }
         }
 
