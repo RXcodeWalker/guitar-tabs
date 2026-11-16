@@ -6,6 +6,11 @@
  * 1. Tube Screamer / Overdrive:
  *    - WaveShaperNode with asymmetric sigmoid transfer curve (analog triode / diode clipping).
  *    - Drive (0-100), Tone (Biquad low-pass tilt filter 800Hz-6500Hz), Output Level.
+ * 1.5. Cabinet & Microphone Simulator:
+ *    - Procedural synthetic impulse response (IR) speaker resonance and acoustic mic modeling.
+ *    - Eliminates harsh fizz from overdrive harmonics.
+ *    - 3 Profiles: 4x12 Closed-Back UK, 2x12 Open-Back US, 1x12 Compact Tweed.
+ *    - Virtual Mic Position (Center to Edge) & Distance (Near to Far).
  * 2. Analog BBD Delay:
  *    - DelayNode with feedback loop and BiquadFilterNode (2200 Hz roll-off)
  *      simulating vintage bucket-brigade device (MN3005) analog degradation.
@@ -20,6 +25,17 @@
  *      while wet processed audio routes to audioContext.destination.
  * 5. Modular API: GuitarEffectsRack(audioContext, sourceNode) with .setParam(effect, param, value).
  */
+
+let CabinetSimulator = (typeof window !== 'undefined' && window.CabinetSimulator) ? window.CabinetSimulator : null;
+if (!CabinetSimulator && typeof require !== 'undefined') {
+    try {
+        CabinetSimulator = require('./cab-sim.js');
+    } catch (e) {
+        try {
+            CabinetSimulator = require('./js/cab-sim.js');
+        } catch (e2) {}
+    }
+}
 
 class GuitarEffectsRack {
     /**
@@ -43,6 +59,13 @@ class GuitarEffectsRack {
                 drive: 45,       // 0 - 100
                 tone: 50,        // 0 - 100 (800 Hz - 6500 Hz)
                 level: 70,       // 0 - 100 (0.0 - 1.5 gain)
+                bypass: false    // true-bypass
+            },
+            cabinet: {
+                profile: '4x12 Closed-Back UK',
+                position: 20,    // 0 - 100 (Center to Edge)
+                distance: 15,    // 0 - 100 (Near to Far)
+                level: 100,      // 0 - 100
                 bypass: false    // true-bypass
             },
             delay: {
@@ -149,6 +172,21 @@ class GuitarEffectsRack {
         this.rackWetInput.connect(this.od.input);
 
         // =====================================================================
+        // 1.5 Cabinet & Microphone Simulator Stage (Speaker Impulse Response)
+        // =====================================================================
+        if (CabinetSimulator) {
+            this.cabSim = new CabinetSimulator(c, {
+                profile: this.state.cabinet.profile,
+                position: this.state.cabinet.position,
+                distance: this.state.cabinet.distance,
+                level: this.state.cabinet.level,
+                bypass: this.state.cabinet.bypass
+            });
+        } else {
+            this.cabSim = null;
+        }
+
+        // =====================================================================
         // 2. Analog BBD Delay Pedal
         // =====================================================================
         this.delay = {
@@ -191,8 +229,14 @@ class GuitarEffectsRack {
         this.delay.bypassDryGain.connect(this.delay.output);
         this.delay.bypassWetGain.connect(this.delay.output);
 
-        // Chain Overdrive -> Delay
-        this.od.output.connect(this.delay.input);
+        // Chain: Overdrive -> Cabinet Simulator -> Delay
+        // Routes saturated overdrive harmonics through authentic speaker IR to eliminate fizz
+        if (this.cabSim) {
+            this.od.output.connect(this.cabSim.input);
+            this.cabSim.output.connect(this.delay.input);
+        } else {
+            this.od.output.connect(this.delay.input);
+        }
 
         // =====================================================================
         // 3. Studio Ambient Reverb Pedal (Spring / Plate IR Convolver)
@@ -280,7 +324,7 @@ class GuitarEffectsRack {
 
     /**
      * Sets a parameter on the guitar effects rack.
-     * @param {string} effect - 'overdrive' | 'delay' | 'reverb' | 'master' (or aliases: 'tubeScreamer', 'bbd', etc.)
+     * @param {string} effect - 'overdrive' | 'cabinet' | 'delay' | 'reverb' | 'master' (or aliases: 'tubeScreamer', 'cabSim', 'bbd', etc.)
      * @param {string} param - Parameter name
      * @param {number|boolean} value - Parameter value
      * @returns {GuitarEffectsRack} returns this for chaining
@@ -290,7 +334,7 @@ class GuitarEffectsRack {
         const pKey = String(param).toLowerCase().trim();
 
         if (!effKey || !this.state[effKey]) {
-            console.warn(`[GuitarEffectsRack] Unknown effect '${effect}'. Valid: overdrive, delay, reverb, master`);
+            console.warn(`[GuitarEffectsRack] Unknown effect '${effect}'. Valid: overdrive, cabinet, delay, reverb, master`);
             return this;
         }
 
@@ -300,6 +344,9 @@ class GuitarEffectsRack {
         switch (effKey) {
             case 'overdrive':
                 this._setOverdriveParam(pKey, value, now, rampTime);
+                break;
+            case 'cabinet':
+                this._setCabinetParam(pKey, value, now, rampTime);
                 break;
             case 'delay':
                 this._setDelayParam(pKey, value, now, rampTime);
@@ -408,6 +455,9 @@ class GuitarEffectsRack {
             clearTimeout(this._irDebounceTimer);
             this._irDebounceTimer = null;
         }
+        if (this.cabSim && typeof this.cabSim.destroy === 'function') {
+            this.cabSim.destroy();
+        }
         this.disconnect();
         if (this.sourceNode) {
             try {
@@ -462,6 +512,46 @@ class GuitarEffectsRack {
                     this.od.dryGain.gain.setTargetAtTime(0.0, now, 0.015);
                     this.od.wetGain.gain.setTargetAtTime(1.0, now, 0.015);
                 }
+                break;
+            }
+        }
+    }
+
+    /**
+     * @private
+     */
+    _setCabinetParam(param, value, now, rampTime) {
+        if (!this.cabSim) return;
+        switch (param) {
+            case 'profile':
+            case 'cab':
+            case 'type':
+                this.cabSim.setProfile(value, true);
+                this.state.cabinet.profile = this.cabSim.getProfile();
+                break;
+            case 'position':
+            case 'micposition':
+            case 'pos':
+            case 'micpos':
+                this.cabSim.setMicPosition(value, false);
+                this.state.cabinet.position = this.cabSim.getMicPosition();
+                break;
+            case 'distance':
+            case 'micdistance':
+            case 'dist':
+            case 'micdist':
+                this.cabSim.setMicDistance(value, false);
+                this.state.cabinet.distance = this.cabSim.getMicDistance();
+                break;
+            case 'level':
+            case 'volume':
+                this.cabSim.setLevel(value);
+                this.state.cabinet.level = this.cabSim.getLevel();
+                break;
+            case 'bypass': {
+                const bypass = Boolean(value);
+                this.cabSim.setBypass(bypass);
+                this.state.cabinet.bypass = bypass;
                 break;
             }
         }
@@ -627,6 +717,12 @@ class GuitarEffectsRack {
         this._setOverdriveParam('tone', this.state.overdrive.tone, now, ramp);
         this._setOverdriveParam('level', this.state.overdrive.level, now, ramp);
         this._setOverdriveParam('bypass', this.state.overdrive.bypass, now, ramp);
+
+        this._setCabinetParam('profile', this.state.cabinet.profile, now, ramp);
+        this._setCabinetParam('position', this.state.cabinet.position, now, ramp);
+        this._setCabinetParam('distance', this.state.cabinet.distance, now, ramp);
+        this._setCabinetParam('level', this.state.cabinet.level, now, ramp);
+        this._setCabinetParam('bypass', this.state.cabinet.bypass, now, ramp);
 
         this._setDelayParam('time', this.state.delay.time, now, ramp);
         this._setDelayParam('feedback', this.state.delay.feedback, now, ramp);
@@ -801,6 +897,9 @@ class GuitarEffectsRack {
         const e = String(effect).toLowerCase().replace(/[^a-z0-9]/g, '');
         if (e === 'overdrive' || e === 'od' || e === 'tubescreamer' || e === 'ts' || e === 'distortion' || e === 'drive') {
             return 'overdrive';
+        }
+        if (e === 'cabinet' || e === 'cab' || e === 'cabsim' || e === 'cabinetsimulator' || e === 'speaker' || e === 'ir') {
+            return 'cabinet';
         }
         if (e === 'delay' || e === 'bbd' || e === 'bbddelay' || e === 'echo') {
             return 'delay';

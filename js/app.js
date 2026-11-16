@@ -1293,6 +1293,62 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    // --- 1.5. Cabinet & Microphone Simulator Controls ---
+    const cabProfileSelect = document.getElementById('cabProfileSelect');
+    const cabPosSlider = document.getElementById('cabPosSlider');
+    const cabPosVal = document.getElementById('cabPosVal');
+    const cabDistSlider = document.getElementById('cabDistSlider');
+    const cabDistVal = document.getElementById('cabDistVal');
+    const btnCabStomp = document.getElementById('btnCabStomp');
+    const cabLed = document.getElementById('cabLed');
+    const cabBypassStatus = document.getElementById('cabBypassStatus');
+
+    if (cabProfileSelect) {
+        cabProfileSelect.addEventListener('change', async (e) => {
+            const rack = await ensureEffectsRack();
+            const prof = e.target.value;
+            rack.setParam('cabinet', 'profile', prof);
+            showToast(`Cabinet Profile: ${prof}`, 'info');
+        });
+    }
+
+    if (cabPosSlider) {
+        cabPosSlider.addEventListener('input', async (e) => {
+            const rack = await ensureEffectsRack();
+            const val = Number(e.target.value);
+            rack.setParam('cabinet', 'position', val);
+            if (cabPosVal) {
+                const label = val <= 33 ? 'Center' : (val >= 67 ? 'Edge' : 'Cone');
+                cabPosVal.textContent = `${label} ${val}%`;
+            }
+        });
+    }
+
+    if (cabDistSlider) {
+        cabDistSlider.addEventListener('input', async (e) => {
+            const rack = await ensureEffectsRack();
+            const val = Number(e.target.value);
+            rack.setParam('cabinet', 'distance', val);
+            if (cabDistVal) {
+                const label = val <= 33 ? 'Near' : (val >= 67 ? 'Far' : 'Mid');
+                cabDistVal.textContent = `${label} ${val}%`;
+            }
+        });
+    }
+
+    if (btnCabStomp) {
+        btnCabStomp.addEventListener('click', async () => {
+            const rack = await ensureEffectsRack();
+            const bypassed = rack.setBypass('cabinet');
+            if (cabLed) cabLed.classList.toggle('active', !bypassed);
+            if (cabBypassStatus) {
+                cabBypassStatus.textContent = bypassed ? 'BYPASSED' : 'ENGAGED';
+                cabBypassStatus.classList.toggle('active', !bypassed);
+            }
+            showToast(bypassed ? 'Cabinet Simulator Bypassed (Raw Fizz).' : 'Cabinet Simulator Engaged (Speaker Resonance)!', 'success');
+        });
+    }
+
     // --- 2. Analog BBD Delay Controls ---
     const delayTimeSlider = document.getElementById('delayTimeSlider');
     const delayTimeVal = document.getElementById('delayTimeVal');

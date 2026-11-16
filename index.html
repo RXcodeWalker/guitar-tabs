@@ -541,7 +541,7 @@
                         <span style="color: #4b5563;">|</span>
                         <div class="routing-tap">
                             <span class="routing-tap-dot wet"></span>
-                            <span>Wet DSP: Overdrive → Delay → Reverb → Destination</span>
+                            <span>Wet DSP: Overdrive → Cab Sim → Delay → Reverb → Destination</span>
                         </div>
                     </div>
                 </div>
@@ -591,6 +591,55 @@
                         <div class="pedal-footswitch-bay">
                             <button id="btnOdStomp" class="pedal-footswitch" title="Toggle Overdrive True-Bypass"></button>
                             <span id="odBypassStatus" class="pedal-switch-status active">ENGAGED</span>
+                        </div>
+                    </div>
+
+                    <!-- 1.5. Cabinet & Microphone Simulator Pedal -->
+                    <div class="stompbox-pedal pedal-cabsim" id="pedalCabSim">
+                        <div class="pedal-top-row">
+                            <div class="pedal-branding">
+                                <span class="pedal-name">Cabinet Simulator</span>
+                                <span class="pedal-subtitle">Speaker &amp; Mic Resonance IR</span>
+                            </div>
+                            <div id="cabLed" class="pedal-jewel-led active" title="Cabinet Simulator Status LED"></div>
+                        </div>
+
+                        <div class="pedal-controls">
+                            <!-- Cab Profile Select -->
+                            <div class="pedal-knob-group">
+                                <div class="pedal-knob-header">
+                                    <span>Profile</span>
+                                </div>
+                                <select id="cabProfileSelect" class="pedal-select" title="Procedural Impulse Response Speaker Cabinet Profile">
+                                    <option value="4x12 Closed-Back UK" selected>4x12 Closed-Back UK</option>
+                                    <option value="2x12 Open-Back US">2x12 Open-Back US</option>
+                                    <option value="1x12 Compact Tweed">1x12 Compact Tweed</option>
+                                </select>
+                            </div>
+
+                            <!-- Mic Position Control -->
+                            <div class="pedal-knob-group">
+                                <div class="pedal-knob-header">
+                                    <span>Position</span>
+                                    <span id="cabPosVal" class="pedal-val-badge">Center 20%</span>
+                                </div>
+                                <input type="range" id="cabPosSlider" class="pedal-slider" min="0" max="100" value="20" title="Microphone position: Center (bright/cutting) to Edge (dark/smooth)">
+                            </div>
+
+                            <!-- Mic Distance Control -->
+                            <div class="pedal-knob-group">
+                                <div class="pedal-knob-header">
+                                    <span>Distance</span>
+                                    <span id="cabDistVal" class="pedal-val-badge">Near 15%</span>
+                                </div>
+                                <input type="range" id="cabDistSlider" class="pedal-slider" min="0" max="100" value="15" title="Microphone distance: Near (proximity bass boost) to Far (ambient room blend)">
+                            </div>
+                        </div>
+
+                        <!-- Stompbox Footswitch Bay -->
+                        <div class="pedal-footswitch-bay">
+                            <button id="btnCabStomp" class="pedal-footswitch" title="Toggle Cabinet Simulator True-Bypass"></button>
+                            <span id="cabBypassStatus" class="pedal-switch-status active">ENGAGED</span>
                         </div>
                     </div>
 
@@ -883,6 +932,7 @@
 
     <!-- Application Scripts -->
     <script src="js/storage.js"></script>
+    <script src="js/cab-sim.js"></script>
     <script src="js/effects-rack.js"></script>
     <script src="js/dsp.js"></script>
     <script src="js/strobe-tuner.js"></script>
