@@ -4,8 +4,10 @@
  * Generates:
  * 1. ASCII Tab: Standard formatted plaintext guitar tablature (strictly 80 chars wide per block with bar lines).
  * 2. Structured JSON: Full score metadata, measures, beats, and notes.
- * 3. MusicXML: Professional score-partwise XML with guitar TAB clef, tuning, and technical string/fret notations (compatible with Guitar Pro, MuseScore, TuxGuitar).
- * 4. MIDI File: Pure client-side binary Standard MIDI File (SMF Type 0) encoder with download triggering.
+ * 3. MusicXML 4.0: Professional W3C MusicXML 4.0 score-partwise XML with guitar TAB clef,
+ *    tuning metadata (<staff-tuning>), meter, tempo, chord symbols (<harmony>), and technical string/fret notations.
+ * 4. Multi-Track MIDI File: Pure client-side binary Standard MIDI File (SMF Type 0 and Type 1)
+ *    encoder with dynamic velocity, tempo meta-events, and multi-track conductor/instrument separation.
  */
 
 class GuitarExporter {
@@ -14,12 +16,13 @@ class GuitarExporter {
         this.artist = options.artist || 'GuitarVision Studio';
         this.tuning = options.tuning || {
             name: 'Standard',
-            strings: [64, 59, 55, 50, 45, 40], // E4, B3, G3, D3, A2, E2
+            strings: [64, 59, 55, 50, 45, 40], // E4, B3, G3, D3, A2, E2 (strings 1 to 6)
             names: ["e", "B", "G", "D", "A", "E"]
         };
         this.bpm = options.bpm || 120;
         this.timeSignature = options.timeSignature || { numerator: 4, denominator: 4 };
-        this.ppq = 480; // Pulses per quarter note for MIDI
+        this.ppq = options.ppq || 480; // Pulses per quarter note for MIDI
+        this.musicXMLVersion = options.musicXMLVersion || '4.0';
     }
 
     /**
@@ -50,6 +53,20 @@ class GuitarExporter {
         return { step, alter, octave };
     }
 
+    /**
+     * Resolves note dynamic velocity (clamped 1-127).
+     * Supports both normalized float (0.0 - 1.0) and raw integer (1 - 127).
+     */
+    resolveVelocity(note) {
+        if (typeof note.velocity === 'number' && !isNaN(note.velocity)) {
+            if (note.velocity <= 1.0 && note.velocity > 0) {
+                return Math.max(1, Math.min(127, Math.round(note.velocity * 127)));
+            }
+            return Math.max(1, Math.min(127, Math.round(note.velocity)));
+        }
+        return 100; // Default standard dynamic velocity (mezzo-forte)
+    }
+
     // =========================================================================
     // 1. ASCII Guitar Tablature (Strictly 80 Characters Wide Per Block)
     // =========================================================================
@@ -57,16 +74,6 @@ class GuitarExporter {
     /**
      * Generates standard plaintext guitar tablature.
      * Each block is strictly formatted to 80 characters width per line with bar lines.
-     * 
-     * Block layout:
-     * Line width: exactly 80 characters.
-     * e|-------------------------------------|-------------------------------------|
-     * Prefix: 2 chars ("e|")
-     * Measure 1: 38 chars
-     * Bar line: 1 char ("|")
-     * Measure 2: 38 chars
-     * Closing bar: 1 char ("|")
-     * Total = 2 + 38 + 1 + 38 + 1 = 80 chars!
      */
     toASCII(notes = [], bpm = this.bpm) {
         const secondsPerBeat = 60 / bpm;
@@ -136,10 +143,8 @@ class GuitarExporter {
 
     /**
      * Builds a single measure grid of 6 strings, exactly 38 characters wide each.
-     * Contains 16 sixteenth steps (2 chars each = 32 chars) + 6 padding chars = 38 chars.
      */
     buildAsciiMeasureGrid(measureNotes, measureStartTime, sixteenthDuration) {
-        // 16 sixteenth slots per string, each slot is 2 chars: '--'
         const grid = Array.from({ length: 6 }, () => Array(16).fill('--'));
 
         for (const note of measureNotes) {
@@ -148,15 +153,15 @@ class GuitarExporter {
             const strIdx = (note.string || 1) - 1;
             const fretStr = String(note.fret !== undefined ? note.fret : 0);
 
-            if (fretStr.length === 1) {
-                grid[strIdx][slot] = `${fretStr}-`;
-            } else {
-                grid[strIdx][slot] = fretStr.slice(0, 2);
+            if (strIdx >= 0 && strIdx < 6) {
+                if (fretStr.length === 1) {
+                    grid[strIdx][slot] = `${fretStr}-`;
+                } else {
+                    grid[strIdx][slot] = fretStr.slice(0, 2);
+                }
             }
         }
 
-        // Combine into 38-char strings:
-        // Leading '--' (2 chars) + 16 slots * 2 chars (32 chars) + trailing '----' (4 chars) = 38 chars
         return grid.map(slots => `--${slots.join('')}----`);
     }
 
@@ -196,7 +201,7 @@ class GuitarExporter {
                     noteName: n.noteName,
                     time: Math.round((n.time || 0) * 1000) / 1000,
                     duration: Math.round((n.duration || 0.35) * 1000) / 1000,
-                    velocity: n.velocity || 0.85
+                    velocity: this.resolveVelocity(n) / 127
                 }))
             });
         }
@@ -223,7 +228,8 @@ class GuitarExporter {
                 midi: this.resolveMidi(n),
                 noteName: n.noteName,
                 time: Math.round((n.time || 0) * 1000) / 1000,
-                duration: Math.round((n.duration || 0.35) * 1000) / 1000
+                duration: Math.round((n.duration || 0.35) * 1000) / 1000,
+                velocity: this.resolveVelocity(n) / 127
             }))
         };
 
@@ -231,36 +237,167 @@ class GuitarExporter {
     }
 
     // =========================================================================
-    // 3. MusicXML Export (Compatible with Guitar Pro, MuseScore, TuxGuitar)
+    // 3. MusicXML 4.0 Guitar Tablature Export
     // =========================================================================
 
     /**
-     * Generates a fully compliant MusicXML 3.1 Partwise XML document.
+     * Parses standard chord name strings into MusicXML <harmony> structure.
+     * Examples: 'C', 'Am', 'G7', 'Fmaj7', 'Am7', 'Dsus2', 'Bdim', 'E/G#', 'Bb7'
+     * @param {string} chordName
+     * @returns {Object}
      */
-    toMusicXML(notes = [], bpm = this.bpm) {
+    parseChordSymbol(chordName) {
+        if (!chordName || typeof chordName !== 'string') return null;
+
+        const str = chordName.trim();
+        // Regex: (Root note A-G)(Accidental #|b)?(Quality)?(Slash bass)?
+        const match = str.match(/^([A-G])([#b])?(.*?)(?:\/([A-G])([#b])?)?$/);
+        if (!match) {
+            return {
+                rootStep: 'C',
+                rootAlter: 0,
+                kind: 'major',
+                text: str
+            };
+        }
+
+        const [, rootStep, rootAcc, rawQuality, bassStep, bassAcc] = match;
+        const rootAlter = rootAcc === '#' ? 1 : rootAcc === 'b' ? -1 : 0;
+        const bassAlter = bassAcc === '#' ? 1 : bassAcc === 'b' ? -1 : 0;
+        const quality = (rawQuality || '').trim();
+
+        let kind = 'major';
+        let text = quality;
+
+        if (quality === '' || quality === 'maj' || quality === 'M') {
+            kind = 'major';
+            text = '';
+        } else if (quality === 'm' || quality === 'min') {
+            kind = 'minor';
+            text = 'm';
+        } else if (quality === '7' || quality === 'dom7') {
+            kind = 'dominant';
+            text = '7';
+        } else if (quality === 'maj7' || quality === 'M7') {
+            kind = 'major-seventh';
+            text = 'maj7';
+        } else if (quality === 'm7' || quality === 'min7') {
+            kind = 'minor-seventh';
+            text = 'm7';
+        } else if (quality === 'sus2') {
+            kind = 'suspended-second';
+            text = 'sus2';
+        } else if (quality === 'sus4' || quality === 'sus') {
+            kind = 'suspended-fourth';
+            text = 'sus4';
+        } else if (quality === 'dim' || quality === 'o') {
+            kind = 'diminished';
+            text = 'dim';
+        } else if (quality === 'dim7' || quality === 'o7') {
+            kind = 'diminished-seventh';
+            text = 'dim7';
+        } else if (quality === 'm7b5' || quality === 'half-dim') {
+            kind = 'half-diminished';
+            text = 'm7b5';
+        } else if (quality === 'aug' || quality === '+') {
+            kind = 'augmented';
+            text = 'aug';
+        } else if (quality === '5') {
+            kind = 'power';
+            text = '5';
+        } else {
+            kind = 'other';
+            text = quality;
+        }
+
+        return {
+            rootStep,
+            rootAlter,
+            kind,
+            text,
+            bassStep: bassStep || null,
+            bassAlter: bassStep ? bassAlter : 0
+        };
+    }
+
+    /**
+     * Formats MusicXML <harmony> element for chord symbols.
+     */
+    formatHarmonyXML(chordInfo, indent = '      ') {
+        if (!chordInfo) return '';
+        let xml = `${indent}<harmony print-frame="no">\n`;
+        xml += `${indent}  <root>\n`;
+        xml += `${indent}    <root-step>${chordInfo.rootStep}</root-step>\n`;
+        if (chordInfo.rootAlter !== 0) {
+            xml += `${indent}    <root-alter>${chordInfo.rootAlter}</root-alter>\n`;
+        }
+        xml += `${indent}  </root>\n`;
+        xml += `${indent}  <kind text="${this.escapeXML(chordInfo.text)}">${chordInfo.kind}</kind>\n`;
+
+        if (chordInfo.bassStep) {
+            xml += `${indent}  <bass>\n`;
+            xml += `${indent}    <bass-step>${chordInfo.bassStep}</bass-step>\n`;
+            if (chordInfo.bassAlter !== 0) {
+                xml += `${indent}    <bass-alter>${chordInfo.bassAlter}</bass-alter>\n`;
+            }
+            xml += `${indent}  </bass>\n`;
+        }
+        xml += `${indent}</harmony>\n`;
+        return xml;
+    }
+
+    /**
+     * Generates a fully compliant MusicXML 4.0 Partwise XML document.
+     * Includes guitar TAB clef, tuning metadata (<staff-tuning>), meter, tempo, chord symbols (<harmony>),
+     * and technical <string> and <fret> elements for every note.
+     * 
+     * @param {Array<Object>} notes Captured tablature notes
+     * @param {number} bpm Tempo in BPM
+     * @param {Object} options Configuration overrides (e.g. version, chords)
+     * @returns {string} XML string
+     */
+    toMusicXML(notes = [], bpm = this.bpm, options = {}) {
+        const xmlVersion = options.version || this.musicXMLVersion || '4.0';
         const secondsPerBeat = 60 / bpm;
         const secondsPerMeasure = secondsPerBeat * this.timeSignature.numerator;
-        const divisions = 4; // 4 divisions per quarter note (1 division = 16th note)
+        const divisions = options.divisions || 4; // 4 divisions per quarter note (16th note resolution)
 
-        const sortedNotes = [...notes].sort((a, b) => (a.time || 0) - (b.time || 0));
+        const sortedNotes = [...notes].sort((a, b) => {
+            if (Math.abs((a.time || 0) - (b.time || 0)) > 0.001) {
+                return (a.time || 0) - (b.time || 0);
+            }
+            return (a.string || 1) - (b.string || 1);
+        });
+
         const maxTime = sortedNotes.length > 0 
             ? Math.max(...sortedNotes.map(n => (n.time || 0) + (n.duration || 0.2))) 
             : secondsPerMeasure;
         const totalMeasures = Math.max(1, Math.ceil(maxTime / secondsPerMeasure));
-
         const currentDate = new Date().toISOString().slice(0, 10);
 
+        // MusicXML DOCTYPE header
         let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
-        xml += `<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">\n`;
-        xml += `<score-partwise version="3.1">\n`;
+        if (xmlVersion === '3.1') {
+            xml += `<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">\n`;
+            xml += `<score-partwise version="3.1">\n`;
+        } else {
+            xml += `<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">\n`;
+            xml += `<score-partwise version="4.0">\n`;
+        }
+
+        // Work metadata
         xml += `  <work>\n`;
         xml += `    <work-title>${this.escapeXML(this.title)}</work-title>\n`;
         xml += `  </work>\n`;
+
+        // Identification & encoding
         xml += `  <identification>\n`;
         xml += `    <creator type="composer">${this.escapeXML(this.artist)}</creator>\n`;
         xml += `    <encoding>\n`;
         xml += `      <software>GuitarVision Studio Audio Transcriber</software>\n`;
         xml += `      <encoding-date>${currentDate}</encoding-date>\n`;
+        xml += `      <supports element="accidental" type="yes"/>\n`;
+        xml += `      <supports element="beam" type="yes"/>\n`;
         xml += `    </encoding>\n`;
         xml += `  </identification>\n`;
 
@@ -280,8 +417,11 @@ class GuitarExporter {
         xml += `    </score-part>\n`;
         xml += `  </part-list>\n`;
 
-        // Part details
+        // Part Body
         xml += `  <part id="P1">\n`;
+
+        // Collect custom chord annotations if passed via options
+        const chordsList = Array.isArray(options.chords) ? options.chords : [];
 
         for (let m = 0; m < totalMeasures; m++) {
             const mNumber = m + 1;
@@ -291,7 +431,7 @@ class GuitarExporter {
 
             xml += `    <measure number="${mNumber}">\n`;
 
-            // Attributes on first measure
+            // Attributes block (Measure 1)
             if (m === 0) {
                 xml += `      <attributes>\n`;
                 xml += `        <divisions>${divisions}</divisions>\n`;
@@ -307,21 +447,25 @@ class GuitarExporter {
                 xml += `          <line>5</line>\n`;
                 xml += `        </clef>\n`;
                 xml += `        <staff-details>\n`;
-                xml += `          <staff-lines>6</staff-lines>\n`;
-                
-                // Guitar 6 strings tuning (1 is high e, 6 is low E)
-                const tuningSteps = ["E", "B", "G", "D", "A", "E"];
-                const tuningOctaves = [4, 3, 3, 3, 2, 2];
-                for (let i = 0; i < 6; i++) {
+                xml += `          <staff-lines>${this.tuning.strings.length || 6}</staff-lines>\n`;
+
+                // Standard and custom tuning metadata (<staff-tuning>)
+                // String 1 is highest pitch (line 1), string 6 is lowest pitch (line 6)
+                for (let i = 0; i < this.tuning.strings.length; i++) {
+                    const stringMidi = this.tuning.strings[i];
+                    const pitchInfo = this.midiToMusicXMLPitch(stringMidi);
                     xml += `          <staff-tuning line="${i + 1}">\n`;
-                    xml += `            <tuning-step>${tuningSteps[i]}</tuning-step>\n`;
-                    xml += `            <tuning-octave>${tuningOctaves[i]}</tuning-octave>\n`;
+                    xml += `            <tuning-step>${pitchInfo.step}</tuning-step>\n`;
+                    if (pitchInfo.alter !== 0) {
+                        xml += `            <tuning-alter>${pitchInfo.alter}</tuning-alter>\n`;
+                    }
+                    xml += `            <tuning-octave>${pitchInfo.octave}</tuning-octave>\n`;
                     xml += `          </staff-tuning>\n`;
                 }
                 xml += `        </staff-details>\n`;
                 xml += `      </attributes>\n`;
 
-                // Metronome / Direction
+                // Metronome and Tempo direction
                 xml += `      <direction placement="above">\n`;
                 xml += `        <direction-type>\n`;
                 xml += `          <metronome>\n`;
@@ -333,25 +477,72 @@ class GuitarExporter {
                 xml += `      </direction>\n`;
             }
 
+            // Check if measure has measure-level chord from options
+            const measureChords = chordsList.filter(c => {
+                if (c.measure === mNumber) return true;
+                if (typeof c.time === 'number') {
+                    return c.time >= mStart && c.time < mEnd;
+                }
+                return false;
+            });
+
+            // Pending chords for this measure sorted by time
+            const pendingChords = [...measureChords].sort((a, b) => {
+                const ta = typeof a.time === 'number' ? a.time : mStart;
+                const tb = typeof b.time === 'number' ? b.time : mStart;
+                return ta - tb;
+            });
+
+            const emitPendingChordsBefore = (targetTime) => {
+                let chordXml = '';
+                while (pendingChords.length > 0) {
+                    const nextChord = pendingChords[0];
+                    const chordTime = typeof nextChord.time === 'number' ? nextChord.time : mStart;
+                    if (chordTime <= targetTime + 0.02) {
+                        pendingChords.shift();
+                        const parsedChord = this.parseChordSymbol(nextChord.chord || nextChord.name);
+                        if (parsedChord) {
+                            chordXml += this.formatHarmonyXML(parsedChord, '      ');
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                return chordXml;
+            };
+
+            // If empty measure -> whole measure rest
             if (mNotes.length === 0) {
-                // Whole measure rest
+                // Render any chord symbols on empty measure
+                xml += emitPendingChordsBefore(mEnd);
                 xml += `      <note>\n`;
                 xml += `        <rest measure="yes"/>\n`;
                 xml += `        <duration>${divisions * this.timeSignature.numerator}</duration>\n`;
                 xml += `        <voice>1</voice>\n`;
                 xml += `      </note>\n`;
             } else {
-                // Render measure notes with technical tab notation
                 let currentMeasureDiv = 0;
                 const totalMeasureDivisions = divisions * this.timeSignature.numerator;
+                let lastNoteTime = -1;
 
                 for (let nIdx = 0; nIdx < mNotes.length; nIdx++) {
                     const note = mNotes[nIdx];
-                    const relTime = Math.max(0, (note.time || 0) - mStart);
+                    const noteTime = note.time !== undefined ? note.time : mStart;
+                    const relTime = Math.max(0, noteTime - mStart);
                     const noteDiv = Math.min(totalMeasureDivisions - 1, Math.round((relTime / secondsPerBeat) * divisions));
+                    const isSimultaneousChordNote = Math.abs(relTime - lastNoteTime) < 0.015 && lastNoteTime >= 0;
 
-                    // Fill rest if there is a gap
-                    if (noteDiv > currentMeasureDiv) {
+                    // Emit any scheduled chords whose time has arrived
+                    xml += emitPendingChordsBefore(noteTime);
+
+                    // Also emit chord directly attached to note if not already emitted
+                    if (note.chord && !isSimultaneousChordNote) {
+                        const parsedChord = this.parseChordSymbol(note.chord);
+                        xml += this.formatHarmonyXML(parsedChord, '      ');
+                    }
+
+                    // Fill rest if there is a gap before a new note
+                    if (!isSimultaneousChordNote && noteDiv > currentMeasureDiv) {
                         const restDuration = noteDiv - currentMeasureDiv;
                         xml += `      <note>\n`;
                         xml += `        <rest/>\n`;
@@ -363,11 +554,13 @@ class GuitarExporter {
 
                     const midi = this.resolveMidi(note);
                     const pitchInfo = this.midiToMusicXMLPitch(midi);
-                    
                     const noteDurationDivs = Math.max(1, Math.round(((note.duration || 0.25) / secondsPerBeat) * divisions));
                     const actualDuration = Math.min(noteDurationDivs, totalMeasureDivisions - currentMeasureDiv);
 
                     xml += `      <note>\n`;
+                    if (isSimultaneousChordNote) {
+                        xml += `        <chord/>\n`;
+                    }
                     xml += `        <pitch>\n`;
                     xml += `          <step>${pitchInfo.step}</step>\n`;
                     if (pitchInfo.alter !== 0) {
@@ -389,10 +582,16 @@ class GuitarExporter {
                     xml += `        </notations>\n`;
                     xml += `      </note>\n`;
 
-                    currentMeasureDiv += actualDuration;
+                    if (!isSimultaneousChordNote) {
+                        currentMeasureDiv += actualDuration;
+                        lastNoteTime = relTime;
+                    }
                 }
 
-                // Fill trailing rest if measure has leftover space
+                // Emit any remaining pending chords before trailing rest
+                xml += emitPendingChordsBefore(mEnd);
+
+                // Fill trailing rest if measure has leftover divisions
                 if (currentMeasureDiv < totalMeasureDivisions) {
                     const leftover = totalMeasureDivisions - currentMeasureDiv;
                     xml += `      <note>\n`;
@@ -430,7 +629,7 @@ class GuitarExporter {
     }
 
     // =========================================================================
-    // 4. MIDI File Encoder (Pure Client-Side Standard MIDI File Format 0)
+    // 4. MIDI File Encoder (Standard MIDI File SMF Type 0 & Type 1 Multi-Track)
     // =========================================================================
 
     /**
@@ -468,17 +667,9 @@ class GuitarExporter {
     }
 
     /**
-     * Encodes recorded notes into a pure binary Standard MIDI File (SMF Type 0).
-     * @param {Array<Object>} notes
-     * @param {number} bpm
-     * @returns {Uint8Array} binary MIDI file bytes
+     * Builds raw chronological Note-On and Note-Off events from note list.
      */
-    toMIDI(notes = [], bpm = this.bpm) {
-        const ppq = this.ppq; // 480 ticks per beat
-        const secondsPerBeat = 60 / bpm;
-        const ticksPerSecond = ppq / secondsPerBeat;
-
-        // Build list of MIDI events: Note-On and Note-Off with absolute tick timestamps
+    buildNoteEvents(notes, ticksPerSecond, channel = 0) {
         const rawEvents = [];
 
         for (const note of notes) {
@@ -486,40 +677,225 @@ class GuitarExporter {
             const startTick = Math.max(0, Math.round((note.time || 0) * ticksPerSecond));
             const durationTicks = Math.max(1, Math.round((note.duration || 0.25) * ticksPerSecond));
             const endTick = startTick + durationTicks;
-            const velocity = Math.max(1, Math.min(127, Math.round((note.velocity || 0.85) * 127)));
+            const velocity = this.resolveVelocity(note);
 
             // Note On
             rawEvents.push({
                 tick: startTick,
-                type: 0x90, // Note On
+                status: 0x90 | (channel & 0x0F),
                 data: [midi, velocity],
-                order: 2 // If simultaneous, Note Off happens before Note On
+                order: 2 // On same tick, Note-Off takes precedence
             });
 
             // Note Off
             rawEvents.push({
                 tick: endTick,
-                type: 0x80, // Note Off
+                status: 0x80 | (channel & 0x0F),
                 data: [midi, 0x00],
                 order: 1
             });
         }
 
-        // Sort events chronologically, with Note-Off prioritized before Note-On on same tick
         rawEvents.sort((a, b) => {
             if (a.tick !== b.tick) return a.tick - b.tick;
             return a.order - b.order;
         });
 
-        // Construct Track Chunk (MTrk) payload
+        return rawEvents;
+    }
+
+    /**
+     * Assembles a single MTrk byte payload from an array of delta-encoded events.
+     */
+    buildTrackChunk(trackData) {
+        const chunk = [];
+        // Chunk ID 'MTrk'
+        chunk.push(0x4D, 0x54, 0x72, 0x6B);
+        // Chunk length
+        chunk.push(...this.uint32ToBytes(trackData.length));
+        // Track events
+        chunk.push(...trackData);
+        return chunk;
+    }
+
+    /**
+     * Builds the Tempo and Time Signature meta events track chunk (for Type 1 Conductor Track).
+     */
+    buildConductorTrack(bpm, ticksPerSecond, tempoEvents = []) {
         const trackData = [];
 
-        // 1. Meta Event: Time Signature (4/4) -> Delta: 0
+        // 1. Time Signature meta-event (delta 0)
         trackData.push(...this.encodeVLQ(0));
         trackData.push(0xFF, 0x58, 0x04, this.timeSignature.numerator, 0x02, 0x18, 0x08);
 
-        // 2. Meta Event: Set Tempo -> Delta: 0
-        // Microseconds per quarter note = 60,000,000 / BPM
+        // 2. Track Name meta-event: "Conductor / Tempo Track"
+        const trackName = `${this.title} (Tempo)`;
+        const nameBytes = Array.from(trackName).map(c => c.charCodeAt(0));
+        trackData.push(...this.encodeVLQ(0));
+        trackData.push(0xFF, 0x03, nameBytes.length, ...nameBytes);
+
+        // 3. Tempo events
+        if (tempoEvents.length > 0) {
+            let lastTick = 0;
+            const sortedTempos = [...tempoEvents].sort((a, b) => (a.time || 0) - (b.time || 0));
+            for (const t of sortedTempos) {
+                const tick = Math.max(0, Math.round((t.time || 0) * ticksPerSecond));
+                const delta = Math.max(0, tick - lastTick);
+                const targetBpm = t.bpm || bpm;
+                const usPerQuarter = Math.round(60000000 / targetBpm);
+                trackData.push(...this.encodeVLQ(delta));
+                trackData.push(
+                    0xFF, 0x51, 0x03,
+                    (usPerQuarter >> 16) & 0xFF,
+                    (usPerQuarter >> 8) & 0xFF,
+                    usPerQuarter & 0xFF
+                );
+                lastTick = tick;
+            }
+        } else {
+            // Initial tempo event
+            const usPerQuarter = Math.round(60000000 / bpm);
+            trackData.push(...this.encodeVLQ(0));
+            trackData.push(
+                0xFF, 0x51, 0x03,
+                (usPerQuarter >> 16) & 0xFF,
+                (usPerQuarter >> 8) & 0xFF,
+                usPerQuarter & 0xFF
+            );
+        }
+
+        // 4. End of Track meta-event (FF 2F 00)
+        trackData.push(...this.encodeVLQ(0));
+        trackData.push(0xFF, 0x2F, 0x00);
+
+        return trackData;
+    }
+
+    /**
+     * Builds an instrument track chunk with track name, program change, and note events.
+     */
+    buildInstrumentTrack(trackName, program, channel, notes, ticksPerSecond) {
+        const trackData = [];
+
+        // 1. Track Name meta-event
+        const nameBytes = Array.from(trackName).map(c => c.charCodeAt(0));
+        trackData.push(...this.encodeVLQ(0));
+        trackData.push(0xFF, 0x03, nameBytes.length, ...nameBytes);
+
+        // 2. Program Change event (0xC0 | channel, program)
+        trackData.push(...this.encodeVLQ(0));
+        trackData.push(0xC0 | (channel & 0x0F), program & 0x7F);
+
+        // 3. Note events with delta times and dynamic velocities
+        const rawEvents = this.buildNoteEvents(notes, ticksPerSecond, channel);
+        let lastTick = 0;
+        for (const ev of rawEvents) {
+            const deltaTicks = Math.max(0, ev.tick - lastTick);
+            trackData.push(...this.encodeVLQ(deltaTicks));
+            trackData.push(ev.status, ...ev.data);
+            lastTick = ev.tick;
+        }
+
+        // 4. End of Track meta-event
+        trackData.push(...this.encodeVLQ(0));
+        trackData.push(0xFF, 0x2F, 0x00);
+
+        return trackData;
+    }
+
+    /**
+     * Encodes recorded notes into a pure binary Standard MIDI File (SMF Type 0 or Type 1).
+     * 
+     * @param {Array<Object>} notes Tablature notes
+     * @param {number} bpm Tempo in BPM
+     * @param {Object} options Configuration options:
+     *   - format: 0 (Type 0 single-track) or 1 (Type 1 multi-track). Default: 0.
+     *   - splitByString: If true in Type 1, splits 6 guitar strings into 6 separate tracks.
+     *   - tempos: Array of dynamic tempo changes [{ time: seconds, bpm: number }]
+     *   - trackName: Custom track name
+     *   - program: MIDI program number (default: 25 for Acoustic Guitar Steel)
+     * @returns {Uint8Array} binary MIDI file bytes
+     */
+    toMIDI(notes = [], bpm = this.bpm, options = {}) {
+        const ppq = this.ppq; // 480 ticks per beat
+        const secondsPerBeat = 60 / bpm;
+        const ticksPerSecond = ppq / secondsPerBeat;
+        const isType1 = options.format === 1 || options.multiTrack === true;
+        const program = typeof options.program === 'number' ? options.program : 25; // 25 = Acoustic Guitar (Steel)
+
+        // =====================================================================
+        // SMF Type 1: Multi-Track Mode
+        // =====================================================================
+        if (isType1) {
+            const trackPayloads = [];
+
+            // Track 0: Conductor Track (Tempo & Meter)
+            const conductorData = this.buildConductorTrack(bpm, ticksPerSecond, options.tempos || []);
+            trackPayloads.push(conductorData);
+
+            if (options.splitByString) {
+                // Separate track per guitar string (Strings 1 to 6)
+                for (let s = 1; s <= 6; s++) {
+                    const stringNotes = notes.filter(n => (n.string || 1) === s);
+                    const stringName = this.tuning.names[s - 1] || `Str ${s}`;
+                    const strTrackData = this.buildInstrumentTrack(
+                        `String ${s} (${stringName})`,
+                        program,
+                        s - 1, // Channel per string (0..5)
+                        stringNotes,
+                        ticksPerSecond
+                    );
+                    trackPayloads.push(strTrackData);
+                }
+            } else if (Array.isArray(options.tracks) && options.tracks.length > 0) {
+                // User provided explicit track definitions
+                for (let tIdx = 0; tIdx < options.tracks.length; tIdx++) {
+                    const t = options.tracks[tIdx];
+                    const tNotes = t.notes || [];
+                    const tName = t.name || `Track ${tIdx + 1}`;
+                    const tProg = typeof t.program === 'number' ? t.program : program;
+                    const tChan = typeof t.channel === 'number' ? t.channel : (tIdx % 16);
+                    trackPayloads.push(this.buildInstrumentTrack(tName, tProg, tChan, tNotes, ticksPerSecond));
+                }
+            } else {
+                // Standard Type 1 with Guitar Track
+                const guitarTrackData = this.buildInstrumentTrack(
+                    options.trackName || "Guitar Tablature",
+                    program,
+                    0,
+                    notes,
+                    ticksPerSecond
+                );
+                trackPayloads.push(guitarTrackData);
+            }
+
+            // Assemble Full Type 1 MIDI File
+            const fileBytes = [];
+            // Header Chunk 'MThd'
+            fileBytes.push(0x4D, 0x54, 0x68, 0x64);
+            fileBytes.push(...this.uint32ToBytes(6)); // Header length
+            fileBytes.push(...this.uint16ToBytes(1)); // Format 1 (Multi-Track)
+            fileBytes.push(...this.uint16ToBytes(trackPayloads.length)); // Track count
+            fileBytes.push(...this.uint16ToBytes(ppq)); // Division
+
+            // Append each track chunk
+            for (const tData of trackPayloads) {
+                fileBytes.push(...this.buildTrackChunk(tData));
+            }
+
+            return new Uint8Array(fileBytes);
+        }
+
+        // =====================================================================
+        // SMF Type 0: Single Track Multi-Channel Mode
+        // =====================================================================
+        const trackData = [];
+
+        // 1. Meta Event: Time Signature
+        trackData.push(...this.encodeVLQ(0));
+        trackData.push(0xFF, 0x58, 0x04, this.timeSignature.numerator, 0x02, 0x18, 0x08);
+
+        // 2. Meta Event: Set Tempo
         const usPerQuarter = Math.round(60000000 / bpm);
         trackData.push(...this.encodeVLQ(0));
         trackData.push(
@@ -529,60 +905,75 @@ class GuitarExporter {
             usPerQuarter & 0xFF
         );
 
-        // 3. Meta Event: Track Name -> Delta: 0
-        const trackName = "GuitarVision Tablature";
+        // Dynamic tempo changes if provided
+        if (Array.isArray(options.tempos) && options.tempos.length > 0) {
+            let lastTempoTick = 0;
+            for (const t of options.tempos) {
+                const tick = Math.max(0, Math.round((t.time || 0) * ticksPerSecond));
+                if (tick > 0) {
+                    const delta = tick - lastTempoTick;
+                    const tempoUs = Math.round(60000000 / (t.bpm || bpm));
+                    trackData.push(...this.encodeVLQ(delta));
+                    trackData.push(
+                        0xFF, 0x51, 0x03,
+                        (tempoUs >> 16) & 0xFF,
+                        (tempoUs >> 8) & 0xFF,
+                        tempoUs & 0xFF
+                    );
+                    lastTempoTick = tick;
+                }
+            }
+        }
+
+        // 3. Meta Event: Track Name
+        const trackName = options.trackName || "GuitarVision Tablature";
         const nameBytes = Array.from(trackName).map(c => c.charCodeAt(0));
         trackData.push(...this.encodeVLQ(0));
         trackData.push(0xFF, 0x03, nameBytes.length, ...nameBytes);
 
-        // 4. Program Change: Acoustic Guitar (Steel = Program 25, 0-indexed: 25)
+        // 4. Program Change: Acoustic Guitar (Steel = Program 25)
         trackData.push(...this.encodeVLQ(0));
-        trackData.push(0xC0, 25);
+        trackData.push(0xC0, program & 0x7F);
 
-        // 5. Append Note Events with delta times
+        // 5. Append Note Events with delta times and dynamic velocities
+        const rawEvents = this.buildNoteEvents(notes, ticksPerSecond, 0);
         let lastTick = 0;
         for (const ev of rawEvents) {
             const deltaTicks = Math.max(0, ev.tick - lastTick);
             trackData.push(...this.encodeVLQ(deltaTicks));
-            trackData.push(ev.type, ...ev.data);
+            trackData.push(ev.status, ...ev.data);
             lastTick = ev.tick;
         }
 
-        // 6. Meta Event: End of Track -> Delta: 0
+        // 6. Meta Event: End of Track
         trackData.push(...this.encodeVLQ(0));
         trackData.push(0xFF, 0x2F, 0x00);
 
-        // =====================================================================
         // Assemble Full MIDI File (MThd + MTrk)
-        // =====================================================================
         const fileBytes = [];
-
-        // Header Chunk: 'MThd' (4 bytes)
         fileBytes.push(0x4D, 0x54, 0x68, 0x64);
-        // Header Length: 6 (4 bytes)
         fileBytes.push(...this.uint32ToBytes(6));
-        // Format: 0 (single track multi-channel) (2 bytes)
-        fileBytes.push(...this.uint16ToBytes(0));
-        // Tracks: 1 (2 bytes)
-        fileBytes.push(...this.uint16ToBytes(1));
-        // Division: 480 PPQ (2 bytes)
+        fileBytes.push(...this.uint16ToBytes(0)); // Format 0
+        fileBytes.push(...this.uint16ToBytes(1)); // 1 track
         fileBytes.push(...this.uint16ToBytes(ppq));
 
-        // Track Chunk: 'MTrk' (4 bytes)
-        fileBytes.push(0x4D, 0x54, 0x72, 0x6B);
-        // Track Length (4 bytes)
-        fileBytes.push(...this.uint32ToBytes(trackData.length));
-        // Track Events
-        fileBytes.push(...trackData);
+        fileBytes.push(...this.buildTrackChunk(trackData));
 
         return new Uint8Array(fileBytes);
     }
 
     /**
+     * Dedicated convenience method to generate multi-track Type 1 MIDI files.
+     */
+    toMultiTrackMIDI(notes = [], bpm = this.bpm, options = {}) {
+        return this.toMIDI(notes, bpm, { ...options, format: 1 });
+    }
+
+    /**
      * Browser helper to trigger download of MIDI file.
      */
-    downloadMIDI(notes, bpm = this.bpm, filename = 'guitar_transcription.mid') {
-        const midiBytes = this.toMIDI(notes, bpm);
+    downloadMIDI(notes, bpm = this.bpm, filename = 'guitar_transcription.mid', options = {}) {
+        const midiBytes = this.toMIDI(notes, bpm, options);
         const blob = new Blob([midiBytes], { type: 'audio/midi' });
         const url = URL.createObjectURL(blob);
 

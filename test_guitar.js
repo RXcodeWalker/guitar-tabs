@@ -263,7 +263,7 @@ assert(jsonObj.notes[0].midi === 40, "JSON note 0 has correct MIDI 40");
 console.log("--- 6.3 MusicXML Score Format (Guitar Pro, MuseScore, TuxGuitar) ---");
 const xmlString = exporter.toMusicXML(sampleNotes, 120);
 assert(xmlString.includes('<?xml version="1.0" encoding="UTF-8"?>'), "MusicXML has XML declaration header");
-assert(xmlString.includes('<score-partwise version="3.1">'), "MusicXML has score-partwise root tag");
+assert(xmlString.includes('<score-partwise') && (xmlString.includes('version="4.0"') || xmlString.includes('version="3.1"')), "MusicXML has score-partwise root tag");
 assert(xmlString.includes('<clef>'), "MusicXML has clef element");
 assert(xmlString.includes('<sign>TAB</sign>'), "MusicXML specifies TAB clef");
 assert(xmlString.includes('<staff-lines>6</staff-lines>'), "MusicXML defines 6 guitar staff lines");
