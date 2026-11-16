@@ -868,6 +868,29 @@ input[type="range"]::-webkit-slider-thumb:hover {
     box-shadow: 0 0 10px var(--led-amber-dim);
 }
 
+.transport-btn.btn-practice.active {
+    background: rgba(0, 243, 255, 0.18);
+    border-color: var(--led-cyan);
+    color: var(--led-cyan);
+    box-shadow: 0 0 12px var(--led-cyan-dim);
+}
+
+.transport-btn.btn-speed-trainer.active {
+    background: rgba(255, 176, 32, 0.18);
+    border-color: var(--led-amber);
+    color: var(--led-amber);
+    box-shadow: 0 0 12px var(--led-amber-dim);
+}
+
+.practice-trainer-bar {
+    transition: all 0.2s ease;
+}
+
+.grade-pill {
+    display: inline-block;
+    transition: all 0.15s ease;
+}
+
 /* =========================================================================
    4. ACTION TRAY (Export ASCII, Download MIDI, Copy Link, Demo Riffs)
    ========================================================================= */
