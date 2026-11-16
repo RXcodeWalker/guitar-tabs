@@ -304,6 +304,56 @@
                     </div>
                 </div>
 
+                <!-- Interactive Practice Mode & Play-Along Speed Trainer Dock -->
+                <div class="tab-transport-bar practice-trainer-bar" id="practiceTrainerBar" style="margin-top: 8px; border-color: rgba(255, 176, 32, 0.35);">
+                    <div class="transport-buttons-group">
+                        <button id="btnPracticeMode" class="transport-btn btn-practice" title="Toggle Interactive Practice & Play-Along Trainer">
+                            <span>🎯</span> Practice Mode: <strong id="practiceModeStatus">OFF</strong>
+                        </button>
+
+                        <span class="module-header-tag" style="color: var(--led-amber);">A-B Loop:</span>
+                        <label style="font-size: 11px; color: var(--text-secondary); display: flex; align-items: center; gap: 4px;">
+                            Start Bar:
+                            <input type="number" id="inputLoopStartBar" min="1" max="64" value="1" class="select-hardware" style="width: 50px; padding: 3px 5px; text-align: center;" title="Loop Start Measure">
+                        </label>
+                        <label style="font-size: 11px; color: var(--text-secondary); display: flex; align-items: center; gap: 4px;">
+                            End Bar:
+                            <input type="number" id="inputLoopEndBar" min="1" max="64" value="2" class="select-hardware" style="width: 50px; padding: 3px 5px; text-align: center;" title="Loop End Measure">
+                        </label>
+                        <button id="btnSetLoopRange" class="transport-btn" title="Set and engage A-B Loop markers">
+                            <span>🔁</span> Set Loop
+                        </button>
+                    </div>
+
+                    <div class="transport-buttons-group">
+                        <button id="btnToggleSpeedTrainer" class="transport-btn btn-speed-trainer" title="Toggle Automatic BPM Acceleration">
+                            <span>⚡</span> Speed Trainer: <strong id="speedTrainerStatus">OFF</strong>
+                        </button>
+                        <label style="font-size: 11px; color: var(--text-secondary); display: flex; align-items: center; gap: 4px;">
+                            Step:
+                            <select id="selectBpmStep" class="select-hardware" style="width: 78px; padding: 3px 5px;" title="BPM increase per completed loop target">
+                                <option value="3">+3 BPM</option>
+                                <option value="5" selected>+5 BPM</option>
+                                <option value="10">+10 BPM</option>
+                            </select>
+                        </label>
+                        <label style="font-size: 11px; color: var(--text-secondary); display: flex; align-items: center; gap: 4px;">
+                            After:
+                            <select id="selectLoopTarget" class="select-hardware" style="width: 82px; padding: 3px 5px;" title="Loops required before acceleration">
+                                <option value="1">1 Loop</option>
+                                <option value="2" selected>2 Loops</option>
+                                <option value="4">4 Loops</option>
+                            </select>
+                        </label>
+                    </div>
+
+                    <div class="transport-buttons-group" style="margin-left: auto; font-family: var(--font-mono); font-size: 11px; gap: 10px;">
+                        <span id="practiceAccuracyDisplay" style="color: var(--led-green); font-weight: 700;">ACCURACY: 100%</span>
+                        <span id="practiceStreakDisplay" style="color: var(--led-cyan);">STREAK: 0</span>
+                        <span id="practiceGradeBadge" class="grade-pill grade-pill-none" style="padding: 2px 8px; border-radius: var(--radius-sm); border: 1px solid #33333e; font-weight: 700;">STANDBY</span>
+                    </div>
+                </div>
+
                 <div class="canvas-frame">
                     <canvas id="tablatureCanvas"></canvas>
                 </div>
@@ -703,11 +753,14 @@
 
             <div class="action-tray-group">
                 <span class="module-header-tag">Demo Riffs:</span>
-                <select id="selectDemoSong" class="select-hardware" style="max-width: 220px;">
+                <select id="selectDemoSong" class="select-hardware" style="max-width: 260px;">
                     <option value="sweetChild">Sweet Child O' Mine (Slash)</option>
                     <option value="smokeOnWater">Smoke On The Water (Deep Purple)</option>
                     <option value="pentatonicRun">A Minor Pentatonic Box (Frets 5-8)</option>
                     <option value="nothingElseMatters">Nothing Else Matters (Metallica)</option>
+                    <option value="majorScaleArpeggio">★ Exercise: C Major Scale Arpeggio</option>
+                    <option value="pentatonicSpeedDrill">★ Exercise: E Minor Pentatonic Speed Run</option>
+                    <option value="chordStrummingSequence">★ Exercise: Open Chords Strumming</option>
                 </select>
                 <button id="btnPlayDemo" class="action-btn" title="Load and playback iconic guitar riff">
                     <span>▶</span> Play Demo
