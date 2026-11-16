@@ -64,13 +64,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         onFretClick: (string, fret) => handleFretboardClick(string, fret)
     });
 
-    // 7. Initialize Auto-Scrolling Tablature Staff
+    // 7. Initialize Auto-Scrolling Tablature Staff & Practice Trainer
     const tablature = new TablatureStaff('tablatureCanvas', {
         bpm: 120,
         pixelsPerBeat: 105,
         playheadRatio: 0.35,
         quantizer: quantizer,
-        onMetronomeClick: (data) => handleMetronomeTick(data)
+        onMetronomeClick: (data) => handleMetronomeTick(data),
+        onSpeedTrainerAccelerate: (newBpm, oldBpm) => {
+            showToast(`⚡ Speed Trainer: Accelerating tempo to ${newBpm} BPM (+${newBpm - oldBpm})!`, 'info');
+            if (tempoSlider) tempoSlider.value = newBpm;
+            if (tempoValue) tempoValue.textContent = `${newBpm} BPM`;
+        }
     });
 
     // 8. Initialize Tablature Playback Controller
@@ -780,6 +785,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             await synth.initAudioContext();
+            if (synth.audioCtx) tablature.setAudioContext(synth.audioCtx);
             playbackController.togglePlayback();
         });
     }

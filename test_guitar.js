@@ -538,6 +538,189 @@ assert(lockedC.chord === "C", "Locked onto chord C");
 const flicker = recHyst.processFrame(specAm, 44100);
 assert(flicker.chord === "C", "Single transient frame does not flicker locked chord");
 
+console.log("\n=== 10. Testing Tablature Interactive Practice & Play-Along Trainer ===");
+
+// 10.1 A-B Loop Selector & Measure Grid Math
+const practiceStaff = new TablatureStaff(null, { bpm: 120, beatsPerMeasure: 4 });
+assert(practiceStaff.bpm === 120, "TablatureStaff initialized with 120 BPM");
+assert(practiceStaff.beatsPerMeasure === 4, "Time signature is 4/4 (4 beats per measure)");
+
+practiceStaff.setLoopRange(1, 2);
+assert(practiceStaff.loopStartBar === 1, "Loop start bar is 1");
+assert(practiceStaff.loopEndBar === 2, "Loop end bar is 2");
+assert(practiceStaff.loopStartTime === 0.0, "At 120 BPM, Bar 1 start time is 0.0s (got " + practiceStaff.loopStartTime + ")");
+assert(practiceStaff.loopEndTime === 4.0, "At 120 BPM, Bar 2 end time is 4.0s (got " + practiceStaff.loopEndTime + ")");
+
+practiceStaff.setLoopRange(3, 5);
+assert(practiceStaff.loopStartBar === 3, "Loop start bar set to 3");
+assert(practiceStaff.loopEndBar === 5, "Loop end bar set to 5");
+assert(practiceStaff.loopStartTime === 4.0, "At 120 BPM, Bar 3 start time is 4.0s (got " + practiceStaff.loopStartTime + ")");
+assert(practiceStaff.loopEndTime === 10.0, "At 120 BPM, Bar 5 end time is 10.0s (got " + practiceStaff.loopEndTime + ")");
+
+// Test tempo change updates loop timestamps
+practiceStaff.setBPM(60); // 1 beat = 1.0s, 1 bar = 4.0s
+assert(practiceStaff.loopStartTime === 8.0, "At 60 BPM, Bar 3 start time dynamically scales to 8.0s (got " + practiceStaff.loopStartTime + ")");
+assert(practiceStaff.loopEndTime === 20.0, "At 60 BPM, Bar 5 end time dynamically scales to 20.0s (got " + practiceStaff.loopEndTime + ")");
+practiceStaff.setBPM(120);
+
+// Loop wrap check
+practiceStaff.setLoopRange(1, 2);
+practiceStaff.togglePracticeMode(true);
+practiceStaff.currentTime = 3.95;
+practiceStaff.updateTimeline(0.10); // Advances to 4.05s >= 4.0s loopEnd
+assert(practiceStaff.currentTime === 0.0, "Playhead strictly wraps back to loopStartTime (0.0s) upon reaching loopEnd (got " + practiceStaff.currentTime + ")");
+
+// 10.2 Progressive Speed Trainer
+let accelNewBpm = 0;
+let accelOldBpm = 0;
+practiceStaff.onSpeedTrainerAccelerate = (next, prev) => {
+    accelNewBpm = next;
+    accelOldBpm = prev;
+};
+
+practiceStaff.enableSpeedTrainer({
+    bpmStep: 5,
+    loopsRequired: 2,
+    maxBpm: 200,
+    minAccuracy: 0.75
+});
+assert(practiceStaff.speedTrainer.enabled === true, "Speed Trainer enabled");
+assert(practiceStaff.speedTrainer.bpmStep === 5, "Speed Trainer acceleration step is +5 BPM");
+assert(practiceStaff.speedTrainer.loopsRequired === 2, "Speed Trainer requires 2 successful loops");
+
+// 1st successful loop
+practiceStaff.notes = [
+    { string: 1, fret: 0, noteName: 'E4', midi: 64, time: 0.5, duration: 0.3, grade: 'perfect' },
+    { string: 2, fret: 1, noteName: 'C4', midi: 60, time: 1.5, duration: 0.3, grade: 'perfect' }
+];
+const loopRes1 = practiceStaff.handleLoopCompletion();
+assert(loopRes1.isSuccessful === true, "Loop 1 evaluated as successful (100% accuracy)");
+assert(practiceStaff.speedTrainer.currentLoopCount === 1, "Completed loop counter incremented to 1");
+assert(practiceStaff.bpm === 120, "Tempo remains at 120 BPM before threshold is reached");
+
+// 2nd successful loop -> Trigger acceleration!
+practiceStaff.notes = [
+    { string: 1, fret: 0, noteName: 'E4', midi: 64, time: 0.5, duration: 0.3, grade: 'perfect' },
+    { string: 2, fret: 1, noteName: 'C4', midi: 60, time: 1.5, duration: 0.3, grade: 'slight' }
+];
+const loopRes2 = practiceStaff.handleLoopCompletion();
+assert(loopRes2.isSuccessful === true, "Loop 2 evaluated as successful");
+assert(loopRes2.accelerated === true, "Speed Trainer accelerated tempo");
+assert(practiceStaff.bpm === 125, "BPM automatically increased by +5 to 125 BPM (got " + practiceStaff.bpm + ")");
+assert(accelNewBpm === 125 && accelOldBpm === 120, "Acceleration callback fired with 125 and 120");
+assert(practiceStaff.speedTrainer.currentLoopCount === 0, "Loop streak reset to 0 after acceleration");
+
+// Low accuracy loop -> Streak reset
+practiceStaff.notes = [
+    { string: 1, fret: 0, noteName: 'E4', midi: 64, time: 0.5, duration: 0.3, grade: 'miss' },
+    { string: 2, fret: 1, noteName: 'C4', midi: 60, time: 1.5, duration: 0.3, grade: 'miss' }
+];
+const loopRes3 = practiceStaff.handleLoopCompletion();
+assert(loopRes3.isSuccessful === false, "Failed accuracy loop evaluated as unsuccessful");
+assert(practiceStaff.speedTrainer.currentLoopCount === 0, "Loop streak remains 0 after failed loop");
+assert(practiceStaff.bpm === 125, "BPM did not accelerate on failed loop");
+
+// 10.3 Strictly Synced AudioContext Playhead Tracking
+const mockAudioCtx = {
+    currentTime: 100.0,
+    state: 'running'
+};
+practiceStaff.setAudioContext(mockAudioCtx);
+practiceStaff.currentTime = 1.0;
+practiceStaff.play();
+assert(practiceStaff.isAudioContextSynced === true, "Playhead is synced to AudioContext clock");
+assert(practiceStaff.audioContextStartTime === 100.0, "AudioContext anchor timestamp captured at 100.0s");
+assert(practiceStaff.playbackStartSongTime === 1.0, "Song anchor time captured at 1.0s");
+
+// Advance audio context clock by 0.5 seconds
+mockAudioCtx.currentTime = 100.5;
+practiceStaff.updateTimeline(0.016);
+assert(Math.abs(practiceStaff.currentTime - 1.5) < 1e-4, "Playhead currentTime strictly equals 1.5s synced to audio clock (got " + practiceStaff.currentTime.toFixed(4) + ")");
+
+practiceStaff.pause();
+assert(practiceStaff.isPlaying === false, "Playback paused");
+
+// 10.4 Real-Time Pitch Accuracy Scorer (±35 cents and ±100ms tolerance)
+const scoreStaff = new TablatureStaff(null, { bpm: 120 });
+scoreStaff.notes = [
+    { id: 'n1', string: 1, fret: 0, noteName: 'E4', midi: 64, time: 1.00, duration: 0.4 },
+    { id: 'n2', string: 2, fret: 1, noteName: 'C4', midi: 60, time: 2.00, duration: 0.4 },
+    { id: 'n3', string: 3, fret: 0, noteName: 'G3', midi: 55, time: 3.00, duration: 0.4 },
+    { id: 'n4', string: 4, fret: 2, noteName: 'E3', midi: 52, time: 4.00, duration: 0.4 }
+];
+
+// Test Perfect Match (Within ±15 cents) -> Green
+scoreStaff.currentTime = 1.04; // 40ms offset (within ±100ms)
+const gradePerfect = scoreStaff.scoreLivePitch({
+    frequency: 329.63,
+    midi: 64,
+    midiExact: 64.05, // +5 cents deviation
+    cents: 5
+});
+assert(gradePerfect !== null, "Scored note 1 within ±100ms time window");
+assert(gradePerfect.grade === 'perfect', "Pitch within ±15 cents graded 'perfect'");
+assert(scoreStaff.notes[0].grade === 'perfect', "Note object updated with 'perfect' grade");
+assert(scoreStaff.colors.gradePerfect === '#10b981', "Perfect grade color is Green (#10b981)");
+assert(scoreStaff.recentGradingFeedbacks.some(f => f.grade === 'perfect' && f.color === '#10b981'), "Recent feedback contains green PERFECT tag");
+
+// Test Slight Sharp/Flat Match (Between 15 and 35 cents, within ±35 cents) -> Yellow
+scoreStaff.currentTime = 1.95; // 50ms offset (within ±100ms)
+const gradeSlight = scoreStaff.scoreLivePitch({
+    frequency: 265.4,
+    midi: 60,
+    midiExact: 60.25, // +25 cents deviation
+    cents: 25
+});
+assert(gradeSlight !== null, "Scored note 2 within ±100ms time window");
+assert(gradeSlight.grade === 'slight', "Pitch between 15 and 35 cents graded 'slight'");
+assert(scoreStaff.notes[1].grade === 'slight', "Note object updated with 'slight' grade");
+assert(scoreStaff.colors.gradeSlight === '#ffb020', "Slight deviation grade color is Yellow/Amber (#ffb020)");
+assert(scoreStaff.recentGradingFeedbacks.some(f => f.grade === 'slight' && f.color === '#ffb020'), "Recent feedback contains yellow slight sharp/flat tag");
+
+// Test Miss (Deviation > 35 cents) -> Red
+scoreStaff.currentTime = 3.02; // 20ms offset (within ±100ms)
+const gradeMiss = scoreStaff.scoreLivePitch({
+    frequency: 220.0,
+    midi: 57, // A3 instead of G3 (MIDI 55) -> 200 cents off
+    midiExact: 57.0,
+    cents: 0
+});
+assert(gradeMiss !== null, "Scored note 3 within ±100ms time window");
+assert(gradeMiss.grade === 'miss', "Pitch deviation > 35 cents graded 'miss'");
+assert(scoreStaff.notes[2].grade === 'miss', "Note object updated with 'miss' grade");
+assert(scoreStaff.colors.gradeMiss === '#ef4444', "Miss grade color is Red (#ef4444)");
+assert(scoreStaff.recentGradingFeedbacks.some(f => f.grade === 'miss' && f.color === '#ef4444'), "Recent feedback contains red MISS tag");
+
+// Test Timing Window Exclusion (Outside ±100ms)
+scoreStaff.currentTime = 4.30; // 300ms after note onset (exceeds ±100ms)
+// Note 4 is at 4.00, duration 0.4. When currentTime = 3.50 (500ms before note), should return null
+scoreStaff.currentTime = 3.50;
+const gradeOutside = scoreStaff.scoreLivePitch({
+    frequency: 164.81,
+    midi: 52,
+    midiExact: 52.0,
+    cents: 0
+});
+assert(gradeOutside === null, "Live pitch outside ±100ms timing window is not matched");
+
+// Test Auto-Miss on unplayed note passing playhead + 100ms
+scoreStaff.currentTime = 4.25; // Playhead advanced past note 4 (at 4.00s) by 250ms without hit
+scoreStaff.updateTimeline(0.016);
+assert(scoreStaff.notes[3].grade === 'miss', "Unplayed note automatically graded 'miss' when playhead passes +100ms window");
+
+// 10.5 Multi-Bar Practice Exercises in DEMO_SONGS
+assert(typeof DEMO_SONGS.majorScaleArpeggio === 'object', "DEMO_SONGS contains majorScaleArpeggio exercise");
+assert(DEMO_SONGS.majorScaleArpeggio.notes.length >= 15, "majorScaleArpeggio contains multiple bars (" + DEMO_SONGS.majorScaleArpeggio.notes.length + " notes)");
+assert(DEMO_SONGS.majorScaleArpeggio.notes.some(n => n.time >= 4.0), "majorScaleArpeggio spans at least 3 bars (time >= 4.0s)");
+
+assert(typeof DEMO_SONGS.pentatonicSpeedDrill === 'object', "DEMO_SONGS contains pentatonicSpeedDrill exercise");
+assert(DEMO_SONGS.pentatonicSpeedDrill.notes.length >= 15, "pentatonicSpeedDrill contains multiple bars (" + DEMO_SONGS.pentatonicSpeedDrill.notes.length + " notes)");
+assert(DEMO_SONGS.pentatonicSpeedDrill.notes.some(n => n.time >= 4.0), "pentatonicSpeedDrill spans at least 3 bars (time >= 4.0s)");
+
+assert(typeof DEMO_SONGS.chordStrummingSequence === 'object', "DEMO_SONGS contains chordStrummingSequence exercise");
+assert(DEMO_SONGS.chordStrummingSequence.notes.length >= 20, "chordStrummingSequence contains multiple bars (" + DEMO_SONGS.chordStrummingSequence.notes.length + " notes)");
+assert(DEMO_SONGS.chordStrummingSequence.notes.some(n => n.time >= 7.0), "chordStrummingSequence spans 4 full bars (time >= 7.0s)");
+
 console.log(`\n========================================`);
 console.log(`Verification Complete: ${testsPassed} passed, ${testsFailed} failed.`);
 if (testsFailed > 0) process.exit(1);

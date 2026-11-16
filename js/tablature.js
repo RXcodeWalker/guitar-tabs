@@ -85,6 +85,12 @@ class TablatureStaff {
             currentLoopCount: 0,
             totalAccelerations: 0
         };
+        Object.defineProperty(this.speedTrainer, 'completedLoops', {
+            get: () => this.speedTrainer.currentLoopCount,
+            set: (v) => { this.speedTrainer.currentLoopCount = v; },
+            configurable: true,
+            enumerable: true
+        });
 
         // =====================================================================
         // Real-Time Pitch Accuracy Scorer Settings
@@ -416,6 +422,7 @@ class TablatureStaff {
         if (typeof config.loopsRequired === 'number') this.speedTrainer.loopsRequired = config.loopsRequired;
         if (typeof config.maxBpm === 'number') this.speedTrainer.maxBpm = config.maxBpm;
         if (typeof config.minAccuracy === 'number') this.speedTrainer.minAccuracy = config.minAccuracy;
+        this.speedTrainer.currentLoopCount = 0;
         this.renderUIState();
         return { ...this.speedTrainer };
     }
