@@ -504,6 +504,40 @@ const wornPartials = [1, 2, 3, 4].map(n => ({
 const wornResult = strobe.calculateInharmonicity(wornPartials);
 assert(wornResult.stringWear === 'Worn', `High-stiffness string (B = 0.00125) classified as 'Worn'`);
 
+console.log("\n=== 9. Testing Polyphonic Chord Recognizer & Scale Recommendation Engine ===");
+const ChordEngine = require('./chord-engine.js');
+
+// 9.1 Clean Exports Verification
+assert(typeof ChordEngine.analyzeChroma === 'function', "analyzeChroma is exported as a clean function");
+assert(typeof ChordEngine.getScaleOverlay === 'function', "getScaleOverlay is exported as a clean function");
+assert(Array.isArray(ChordEngine.BUILTIN_TEST_DATA), "BUILTIN_TEST_DATA is exported");
+
+// 9.2 Built-in Chord Detection Verification
+const chordResults = ChordEngine.verifyChordDetection();
+assert(chordResults.length >= 10, "Built-in test suite covers at least 10 chords");
+for (const cr of chordResults) {
+    assert(cr.passed, `Built-in detection: ${cr.testChord} -> ${cr.detectedChord} (${cr.confidence}%, Root: ${cr.root})`);
+}
+
+// 9.3 Scale Overlay Recommendation (Am7 -> A Minor Pentatonic / A Dorian)
+const am7Scale = ChordEngine.getScaleOverlay("Am7");
+assert(am7Scale.scaleName === "A Minor Pentatonic / A Dorian", `Am7 scale recommendation is '${am7Scale.scaleName}'`);
+assert(am7Scale.length === 138, `Scale overlay provides 138 guitar neck positions (got ${am7Scale.length})`);
+assert(am7Scale.targetNotes.includes("A") && am7Scale.targetNotes.includes("C") && am7Scale.targetNotes.includes("E") && am7Scale.targetNotes.includes("G"), "Am7 target notes are chord tones [A, C, E, G]");
+assert(am7Scale.passingNotes.includes("B") && am7Scale.passingNotes.includes("D") && am7Scale.passingNotes.includes("F#"), "Am7 passing notes are [B, D, F#]");
+assert(am7Scale.avoidNotes.includes("F"), "Am7 avoid notes include F");
+
+// 9.4 Fast Hysteresis Anti-Flicker Check
+const recHyst = new ChordEngine.PolyphonicChordRecognizer({ stabilityThreshold: 3 });
+const specC = ChordEngine.generateChordSpectrum("C", 44100, 4096);
+const specAm = ChordEngine.generateChordSpectrum("Am", 44100, 4096);
+recHyst.processFrame(specC, 44100);
+recHyst.processFrame(specC, 44100);
+const lockedC = recHyst.processFrame(specC, 44100);
+assert(lockedC.chord === "C", "Locked onto chord C");
+const flicker = recHyst.processFrame(specAm, 44100);
+assert(flicker.chord === "C", "Single transient frame does not flicker locked chord");
+
 console.log(`\n========================================`);
 console.log(`Verification Complete: ${testsPassed} passed, ${testsFailed} failed.`);
 if (testsFailed > 0) process.exit(1);
