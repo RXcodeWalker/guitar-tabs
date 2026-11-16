@@ -195,6 +195,71 @@
                     </div>
                 </div>
 
+                <!-- Polyphonic Chord Recognition & Live Scale Overlay HUD Ribbon -->
+                <div class="chord-scale-ribbon">
+                    <div class="chord-detection-cluster">
+                        <span class="module-header-tag">Live Chord:</span>
+                        <div id="detectedChordBadge" class="chord-badge" title="Active Detected Polyphonic Chord">Am7</div>
+                        <div id="chordConfidenceBadge" class="chord-metric-pill" title="Detection Confidence">95% Conf</div>
+                        <div id="chordRootBadge" class="chord-metric-pill" title="Acoustic Root Note">Root: A</div>
+                    </div>
+
+                    <div class="scale-recommendation-cluster">
+                        <span class="module-header-tag">Scale:</span>
+                        <div id="recommendedScaleBadge" class="scale-recommendation-pill" title="Recommended Scale & Tonality">
+                            A Minor Pentatonic / A Dorian
+                        </div>
+                    </div>
+
+                    <div class="scale-tools-cluster">
+                        <span class="module-header-tag">Preset:</span>
+                        <select id="selectTestChord" class="select-hardware" title="Select Chord to Overlay Scale">
+                            <option value="Am7" selected>Am7 (A Minor 7th)</option>
+                            <option value="C">C (C Major)</option>
+                            <option value="Am">Am (A Minor)</option>
+                            <option value="G7">G7 (G Dominant 7th)</option>
+                            <option value="Fmaj7">Fmaj7 (F Major 7th)</option>
+                            <option value="Cmaj7">Cmaj7 (C Major 7th)</option>
+                            <option value="Em7">Em7 (E Minor 7th)</option>
+                            <option value="Dsus2">Dsus2 (D Suspended 2nd)</option>
+                            <option value="Asus4">Asus4 (A Suspended 4th)</option>
+                            <option value="Bdim">Bdim (B Diminished)</option>
+                            <option value="D">D Major</option>
+                            <option value="Em">E Minor</option>
+                            <option value="A7">A Dominant 7th</option>
+                        </select>
+
+                        <button id="btnToggleScaleOverlay" class="toggle-switch-btn active" title="Toggle Live Scale Overlay on Fretboard">
+                            <span class="jewel-led jewel-cyan"></span> Overlay: ON
+                        </button>
+
+                        <select id="selectOverlayMode" class="select-hardware" title="Overlay Label Mode">
+                            <option value="noteName">Notes (A, C, E, G)</option>
+                            <option value="interval">Intervals (R, 3, 5, 7)</option>
+                        </select>
+
+                        <button id="btnToggleAvoidNotes" class="toggle-switch-btn" title="Toggle Avoid / Clashing Notes Visibility">
+                            <span>Avoid: HIDE</span>
+                        </button>
+                    </div>
+
+                    <!-- Fretboard Scale Legend -->
+                    <div class="scale-legend-cluster">
+                        <div class="legend-item" title="Chord Tones: Root, 3rd, 5th, 7th">
+                            <span class="legend-dot dot-target"></span>
+                            <span>Target</span>
+                        </div>
+                        <div class="legend-item" title="Passing & Safe Extensions">
+                            <span class="legend-dot dot-passing"></span>
+                            <span>Passing</span>
+                        </div>
+                        <div class="legend-item" title="Clashing Half-Step Avoid Intervals">
+                            <span class="legend-dot dot-avoid"></span>
+                            <span>Avoid</span>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="canvas-frame">
                     <canvas id="fretboardCanvas"></canvas>
                 </div>
@@ -775,6 +840,7 @@
     <script src="js/tablature.js"></script>
     <script src="js/spectral-visualizer.js"></script>
     <script src="js/demo-songs.js"></script>
+    <script src="js/chord-engine.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>
