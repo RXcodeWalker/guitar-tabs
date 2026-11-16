@@ -53,7 +53,38 @@ class GuitarSynth {
 
             this.masterGain.connect(this.bodyFilter);
             this.bodyFilter.connect(this.audioCtx.destination);
+
+            // Connect to Analyser for FFT spectral visualization & meters
+            this.analyser = this.audioCtx.createAnalyser();
+            this.analyser.fftSize = 2048;
+            this.analyser.smoothingTimeConstant = 0.2;
+            this.masterGain.connect(this.analyser);
         }
+    }
+
+    /**
+     * Routes synth audio through an external GuitarEffectsRack or restores direct destination routing.
+     * @param {GuitarEffectsRack|null} effectsRack
+     */
+    routeThroughEffectsRack(effectsRack) {
+        this.effectsRack = effectsRack || null;
+        if (this.bodyFilter && this.audioCtx) {
+            try {
+                this.bodyFilter.disconnect();
+            } catch (e) {}
+
+            if (effectsRack && effectsRack.inputNode) {
+                // Route through Effects Rack input
+                this.bodyFilter.connect(effectsRack.inputNode);
+            } else {
+                // Direct to destination
+                this.bodyFilter.connect(this.audioCtx.destination);
+            }
+        }
+    }
+
+    getAnalyser() {
+        return this.analyser;
     }
 
     setVolume(vol) {
@@ -230,6 +261,7 @@ class TablaturePlaybackController {
 
         this.isPlaying = false;
         this.isPaused = false;
+        this.isLooping = options.isLooping || false;
         this.playbackTime = 0;
         this.animationId = null;
         this.lastFrameTime = 0;
@@ -238,6 +270,18 @@ class TablaturePlaybackController {
         // Callbacks
         this.onPlaybackStateChange = options.onPlaybackStateChange || null;
         this.onNoteTrigger = options.onNoteTrigger || null;
+    }
+
+    /**
+     * Toggles loop mode.
+     */
+    toggleLoop() {
+        this.isLooping = !this.isLooping;
+        return this.isLooping;
+    }
+
+    setLoop(looping) {
+        this.isLooping = !!looping;
     }
 
     /**
@@ -366,8 +410,14 @@ class TablaturePlaybackController {
         // Check if playback reached the end of the score
         const songEndTime = this.getSongEndTime();
         if (this.playbackTime >= songEndTime) {
-            this.stopPlayback();
-            return;
+            if (this.isLooping && notes.length > 0) {
+                this.playbackTime = 0;
+                this.scheduledNoteIndices.clear();
+                this.tablature.currentTime = 0;
+            } else {
+                this.stopPlayback();
+                return;
+            }
         }
 
         this.animationId = requestAnimationFrame(() => this.loop());

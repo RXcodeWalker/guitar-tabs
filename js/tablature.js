@@ -44,17 +44,17 @@ class TablatureStaff {
 
         // Styling
         this.colors = {
-            background: '#0d1117',
-            gutterBg: '#161b22',
-            staffLine: '#30363d',
-            measureBar: '#8b949e',
-            beatTick: '#21262d',
+            background: '#0a0a0d',
+            gutterBg: '#141418',
+            staffLine: '#262632',
+            measureBar: '#5a5a6c',
+            beatTick: '#1a1a24',
             playhead: '#00f3ff',
-            playheadGlow: 'rgba(0, 243, 255, 0.45)',
-            notePillBg: '#1f2937',
-            noteBorder: '#38bdf8',
+            playheadGlow: 'rgba(0, 243, 255, 0.5)',
+            notePillBg: '#1a1a22',
+            noteBorder: '#00f3ff',
             noteText: '#ffffff',
-            stringText: '#8b949e',
+            stringText: '#9ca3af',
             activePillBg: '#0284c7'
         };
 

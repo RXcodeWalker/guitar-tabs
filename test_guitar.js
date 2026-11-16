@@ -16,6 +16,8 @@ const { GuitarSynth, TablaturePlaybackController } = require('./js/synth.js');
 const GuitarExporter = require('./js/exporter.js');
 const TablatureStaff = require('./js/tablature.js');
 const DEMO_SONGS = require('./js/demo-songs.js');
+const GuitarEffectsRack = require('./js/effects-rack.js');
+const { StrobeTuner, TUNING_PRESETS } = require('./js/strobe-tuner.js');
 
 let testsPassed = 0;
 let testsFailed = 0;
@@ -338,6 +340,169 @@ assert(slashXML.includes('<measure number="1">') && slashXML.includes('<measure 
 
 const slashMIDI = exporter.toMIDI(slashNotes, slashBpm);
 assert(slashMIDI.length > 200, `Sweet Child O' Mine MIDI encodes into ${slashMIDI.length} bytes`);
+
+console.log("\n=== 7. Testing Guitar Effects Rack (Stompbox Chain) DSP Engine ===");
+// Mock Web Audio Context for Node.js
+class TestMockAudioParam {
+    constructor(v = 0) { this.value = v; this.targetValue = v; }
+    setValueAtTime(v) { this.value = v; this.targetValue = v; }
+    setTargetAtTime(v) { this.targetValue = v; this.value = v; }
+}
+class TestMockNode {
+    constructor(ctx, type) { this.context = ctx; this.nodeType = type; this.connections = []; }
+    connect(d) { this.connections.push(d); return d; }
+    disconnect(d) { if (!d) this.connections = []; else this.connections = this.connections.filter(c => c !== d); }
+}
+class TestMockGain extends TestMockNode { constructor(ctx) { super(ctx, 'Gain'); this.gain = new TestMockAudioParam(1); } }
+class TestMockFilter extends TestMockNode { constructor(ctx) { super(ctx, 'Filter'); this.type = 'lowpass'; this.frequency = new TestMockAudioParam(350); this.Q = new TestMockAudioParam(1); } }
+class TestMockShaper extends TestMockNode { constructor(ctx) { super(ctx, 'Shaper'); this.curve = null; this.oversample = 'none'; } }
+class TestMockDelay extends TestMockNode { constructor(ctx) { super(ctx, 'Delay'); this.delayTime = new TestMockAudioParam(0); } }
+class TestMockConvolver extends TestMockNode { constructor(ctx) { super(ctx, 'Convolver'); this.buffer = null; this.normalize = true; } }
+class TestMockAnalyser extends TestMockNode { constructor(ctx) { super(ctx, 'Analyser'); this.fftSize = 2048; this.smoothingTimeConstant = 0; } }
+class TestMockBuffer {
+    constructor(ch, len, sr) {
+        this.numberOfChannels = ch; this.length = len; this.sampleRate = sr;
+        this.channels = [new Float32Array(len), new Float32Array(len)];
+    }
+    getChannelData(c) { return this.channels[c]; }
+}
+class TestMockAudioCtx {
+    constructor() { this.sampleRate = 44100; this.currentTime = 0; this.destination = new TestMockNode(this, 'Destination'); }
+    createGain() { return new TestMockGain(this); }
+    createBiquadFilter() { return new TestMockFilter(this); }
+    createWaveShaper() { return new TestMockShaper(this); }
+    createDelay() { return new TestMockDelay(this); }
+    createConvolver() { return new TestMockConvolver(this); }
+    createAnalyser() { return new TestMockAnalyser(this); }
+    createBuffer(ch, len, sr) { return new TestMockBuffer(ch, len, sr); }
+}
+
+const fxCtx = new TestMockAudioCtx();
+const fxSource = fxCtx.createGain();
+const fxRack = new GuitarEffectsRack(fxCtx, fxSource);
+
+// 7.1 Routing & Performance
+assert(fxRack !== null, "GuitarEffectsRack instantiated cleanly with zero external dependencies");
+assert(fxRack.pitchAnalyser !== null, "Pitch AnalyserNode dedicated raw tap exists");
+assert(fxRack.inputNode.connections.includes(fxRack.pitchAnalyser), "Split routing: Raw audio connects to pitchAnalyser for pristine tracking");
+assert(fxSource.connections.includes(fxRack.inputNode), "Audio input connects to effects rack input node");
+
+// 7.2 Tube Screamer / Overdrive
+assert(fxRack.od.waveShaper.oversample === '4x', "Tube Screamer WaveShaper uses 4x oversampling");
+const odCurve = fxRack._generateOverdriveCurve(4096, 0.35, 2.2);
+assert(odCurve.length === 4096, "Overdrive non-linear transfer curve generated with 4096 points");
+assert(Math.abs(odCurve[2048]) < 0.001, "Overdrive transfer curve at x=0 has zero DC offset");
+assert(odCurve[3072] > 0 && odCurve[1024] < 0, "Overdrive curve is bipolar");
+assert(Math.abs(Math.abs(odCurve[3072]) - Math.abs(odCurve[1024])) > 0.04, "Overdrive curve exhibits asymmetric saturation (even harmonics)");
+
+fxRack.setParam('overdrive', 'drive', 65);
+assert(fxRack.getParam('overdrive', 'drive') === 65, "Overdrive drive set to 65");
+fxRack.setParam('overdrive', 'tone', 80);
+assert(fxRack.getParam('overdrive', 'tone') === 80, "Overdrive tone set to 80");
+assert(fxRack.od.toneFilter.frequency.targetValue > 2500, "Tone 80 shifts low-pass tilt cutoff to bright treble");
+fxRack.setParam('overdrive', 'level', 85);
+assert(fxRack.getParam('overdrive', 'level') === 85, "Overdrive level set to 85");
+fxRack.setBypass('overdrive', true);
+assert(fxRack.isBypassed('overdrive') === true, "Overdrive true-bypass engages clean dry path");
+
+// 7.3 Analog BBD Delay
+assert(fxRack.delay.bbdFilter.type === 'lowpass', "BBD delay has analog lowpass filter in feedback path");
+assert(fxRack.delay.bbdFilter.frequency.value === 2200, "BBD analog filter cutoff set to 2200 Hz");
+fxRack.setParam('delay', 'time', 400);
+assert(fxRack.getParam('delay', 'time') === 400, "Delay time set to 400ms");
+assert(Math.abs(fxRack.delay.delayNode.delayTime.targetValue - 0.4) < 0.001, "DelayNode delayTime converted to 0.4s");
+fxRack.setParam('delay', 'feedback', 110);
+assert(fxRack.getParam('delay', 'feedback') === 90, "Delay feedback safely clamped to 90% max");
+fxRack.setParam('delay', 'mix', 45);
+assert(fxRack.getParam('delay', 'mix') === 45, "Delay mix set to 45%");
+
+// 7.4 Studio Ambient Reverb
+assert(fxRack.reverb.convolver.buffer !== null, "Convolver initialized with synthetic IR buffer");
+assert(fxRack.reverb.convolver.buffer.numberOfChannels === 2, "Synthetic IR buffer is stereo");
+fxRack.setParam('reverb', 'size', 2.8);
+assert(fxRack.getParam('reverb', 'size') === 2.8, "Reverb size set to 2.8s");
+fxRack.setParam('reverb', 'damping', 60);
+assert(fxRack.getParam('reverb', 'damping') === 60, "Reverb damping set to 60%");
+fxRack.setParam('reverb', 'mix', 35);
+assert(fxRack.getParam('reverb', 'mix') === 35, "Reverb mix set to 35%");
+
+// 7.5 Master True-Bypass & State
+fxRack.setBypass('master', true);
+assert(fxRack.isBypassed('master') === true, "Master rack true-bypass engaged");
+assert(fxRack.master.masterBypassDry.gain.targetValue === 1.0, "Master bypass routes raw audio directly to output");
+fxRack.setBypass('master', false);
+assert(fxRack.isBypassed('master') === false, "Master rack re-engaged");
+
+const fxState = fxRack.getState();
+assert(fxState.overdrive.drive === 65, "State snapshot contains accurate overdrive drive");
+assert(fxState.delay.time === 400, "State snapshot contains accurate delay time");
+assert(fxState.reverb.damping === 60, "State snapshot contains accurate reverb damping");
+
+console.log("\n=== 8. Testing Virtual Strobe Tuner & Acoustic Inharmonicity Analyzer ===");
+const strobe = new StrobeTuner(null, null, null, { a4: 440, preset: 'standard' });
+
+// 8.1 API & Preset Verification
+assert(typeof strobe.start === 'function', "StrobeTuner exposes .start() method");
+assert(typeof strobe.stop === 'function', "StrobeTuner exposes .stop() method");
+assert(typeof strobe.setTuning === 'function', "StrobeTuner exposes .setTuning() method");
+assert(typeof strobe.getFrequencies === 'function', "StrobeTuner exposes .getFrequencies() method");
+
+// Verify all 6 alternate tuning presets
+const presets = ['standard', 'dropD', 'dadgad', 'openD', 'openG', 'halfStep'];
+presets.forEach(p => {
+    const t = strobe.setTuning(p);
+    assert(t.preset === p, `setTuning successfully switches to '${p}'`);
+    assert(t.frequencies.length === 6, `'${p}' returns 6 open-string frequencies`);
+    assert(t.frequencies.every(f => f > 50 && f < 500), `'${p}' frequencies are within valid guitar range`);
+});
+
+// Dynamic fretboard remapping via open-string frequencies
+const openGTuning = strobe.setTuning('openG');
+opt.setTuning('openG');
+assert(opt.openMidi[5] === 38, "In Open G tuning, String 6 is tuned down to D2 (MIDI 38)");
+assert(opt.openMidi[4] === 43, "In Open G tuning, String 5 is tuned down to G2 (MIDI 43)");
+
+// 8.2 Strobe Dynamics (Clockwise sharp, Counter-clockwise flat, Stationary zero)
+strobe.cents = 0.0;
+strobe.hasSignal = true;
+strobe.outerAngle = 0.5;
+strobe.lastFrameTime = 1000;
+strobe.update(1020);
+assert(Math.abs(strobe.outerAngle - 0.5) < 1e-5, "Strobe wheel is stationary (0 drift) at 0.0 cents");
+
+strobe.cents = 12.0; // Sharp
+strobe.outerAngle = 0.0;
+strobe.lastFrameTime = 1000;
+strobe.update(1050);
+assert(strobe.outerAngle > 0, "Strobe wheel rotates clockwise for sharp note (+12¢)");
+
+strobe.cents = -12.0; // Flat
+strobe.outerAngle = 1.0;
+strobe.lastFrameTime = 1000;
+strobe.update(1050);
+assert(strobe.outerAngle < 1.0, "Strobe wheel rotates counter-clockwise for flat note (-12¢)");
+
+// 8.3 Acoustic Inharmonicity (String Stiffness Model: fn = n * f0 * sqrt(1 + B * n^2))
+const testB = 0.00042;
+const nominalF0 = 110.0; // A2 string
+const syntheticPartials = [1, 2, 3, 4].map(n => ({
+    n: n,
+    freq: n * nominalF0 * Math.sqrt(1 + testB * n * n)
+}));
+
+const inharmResult = strobe.calculateInharmonicity(syntheticPartials);
+assert(Math.abs(inharmResult.B - testB) < 1e-6, `Inharmonicity B calculated as ${inharmResult.B.toFixed(6)} (matches target ${testB})`);
+assert(Math.abs(inharmResult.f0 - nominalF0) < 0.05, `Fundamental f0 recovered as ${inharmResult.f0.toFixed(2)} Hz`);
+assert(inharmResult.rSquared > 0.9999, `Regression R^2 is ${inharmResult.rSquared.toFixed(5)}`);
+assert(inharmResult.stringWear === 'Good', `String with B = 0.00042 classified as 'Good'`);
+
+// Test worn string wear assessment
+const wornPartials = [1, 2, 3, 4].map(n => ({
+    n: n,
+    freq: n * nominalF0 * Math.sqrt(1 + 0.00125 * n * n)
+}));
+const wornResult = strobe.calculateInharmonicity(wornPartials);
+assert(wornResult.stringWear === 'Worn', `High-stiffness string (B = 0.00125) classified as 'Worn'`);
 
 console.log(`\n========================================`);
 console.log(`Verification Complete: ${testsPassed} passed, ${testsFailed} failed.`);

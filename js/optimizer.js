@@ -12,7 +12,9 @@ class GuitarOptimizer {
             standard: [64, 59, 55, 50, 45, 40], // e4, B3, G3, D3, A2, E2
             dropD:    [64, 59, 55, 50, 45, 38], // e4, B3, G3, D3, A2, D2
             halfStep: [63, 58, 54, 49, 44, 39], // Eb4, Bb3, Gb3, Db3, Ab2, Eb2
-            dadgad:   [62, 57, 55, 50, 45, 38]  // D4, A3, G3, D3, A2, D2
+            dadgad:   [62, 57, 55, 50, 45, 38], // D4, A3, G3, D3, A2, D2
+            openD:    [62, 57, 54, 50, 45, 38], // D4, A3, F#3, D3, A2, D2
+            openG:    [62, 59, 55, 50, 43, 38]  // D4, B3, G3, D3, G2, D2
         };
 
         this.currentTuningName = options.tuning || 'standard';
@@ -34,10 +36,13 @@ class GuitarOptimizer {
     /**
      * Changes the guitar tuning.
      */
-    setTuning(tuningName) {
-        if (this.tunings[tuningName]) {
+    setTuning(tuningName, customMidi = null) {
+        if (Array.isArray(tuningName) && tuningName.length === 6) {
+            this.openMidi = [...tuningName];
+            this.currentTuningName = 'custom';
+        } else if (this.tunings[tuningName]) {
             this.currentTuningName = tuningName;
-            this.openMidi = [...this.tunings[tuningName]];
+            this.openMidi = customMidi && customMidi.length === 6 ? [...customMidi] : [...this.tunings[tuningName]];
         }
     }
 

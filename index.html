@@ -3,125 +3,118 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Real-Time Guitar Fretboard & Auto-Scrolling Tablature Visualizer</title>
+    <title>FretDSP — Real-Time Acoustic & Polyphonic Tablature Engine</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
     <div class="app-container">
-        <!-- 1. Header & Live Audio Tuner HUD -->
-        <header class="app-header">
+        <!-- 1. TOP HEADER: Title, RMS dB Gain Meter, Clip Warning, Mic Selector -->
+        <header class="chassis-panel app-header">
+            <div class="screw screw-tl"></div>
+            <div class="screw screw-tr"></div>
+            <div class="screw screw-bl"></div>
+            <div class="screw screw-br"></div>
+
+            <!-- Brand Insignia & Engine Title -->
             <div class="brand-section">
-                <span class="brand-icon">🎸</span>
-                <div>
-                    <h1 class="brand-title">GuitarVision Studio</h1>
-                    <div class="brand-subtitle">Real-Time DSP Pitch • Ergonomic Fretboard • Auto-Scrolling Tab</div>
+                <div class="brand-insignia">🎸</div>
+                <div class="brand-title-wrap">
+                    <div class="brand-title-row">
+                        <h1 class="brand-title">FretDSP</h1>
+                        <span class="brand-badge">DSP v2.4 • 64-BIT</span>
+                    </div>
+                    <div class="brand-subtitle">Real-Time Acoustic & Polyphonic Tablature Engine</div>
                 </div>
             </div>
 
-            <!-- Pitch, Tuner & Hand Position HUD -->
-            <div class="tuner-hud">
-                <div class="note-display">
-                    <div id="noteBadge" class="note-badge">--</div>
-                    <div id="freqDisplay" class="freq-display">0.0 Hz</div>
+            <!-- Input Gain Meter (RMS dB with Clip Warning) -->
+            <div class="gain-meter-rack">
+                <div class="meter-meta">
+                    <span class="meter-label">Input Gain</span>
+                    <span id="inputGainDb" class="meter-db-readout">-inf dBFS</span>
                 </div>
 
-                <div class="tuner-meter">
-                    <div class="meter-track">
-                        <div class="meter-center-tick"></div>
-                        <div id="tunerNeedle" class="tuner-needle"></div>
+                <div class="segmented-meter-unit">
+                    <div class="segmented-meter-scale">
+                        <span>-42</span>
+                        <span>-24</span>
+                        <span>-12</span>
+                        <span>-6</span>
+                        <span>-3</span>
+                        <span>0dB</span>
                     </div>
-                    <div id="centsDisplay" class="cents-display">0¢</div>
-                </div>
-
-                <!-- Ergonomic Hand Position Anchor -->
-                <div id="handPosBadge" class="hand-position-badge" title="Ergonomic Hand Position Anchor">Pos: Fret 1</div>
-
-                <!-- Live Audio VU Meter -->
-                <div class="vu-meter-container" title="Audio Input Level">
-                    <div class="vu-label">Level</div>
-                    <div class="vu-track">
-                        <div id="vuMeterBar" class="vu-bar"></div>
+                    <div class="meter-led-bar-wrap" title="Calibrated RMS Signal Meter">
+                        <div id="vuMeterBar" class="meter-led-progress"></div>
                     </div>
                 </div>
 
-                <!-- Metronome Pulse LED & Counter -->
-                <div class="metronome-hud" title="4/4 Metronome Beat">
-                    <div id="metronomePulse" class="metronome-pulse"></div>
-                    <div id="metronomeBeatDisplay" class="metronome-beat-display">M1 : Beat 1</div>
+                <!-- Clip Warning Jewel Indicator -->
+                <div class="clip-indicator-wrap" title="Analog/Digital Peak Clip Warning">
+                    <div id="clipWarningLed" class="clip-led"></div>
+                    <span id="clipWarningText" class="clip-text">CLIP</span>
                 </div>
             </div>
 
-            <div class="header-actions">
-                <span id="micStatusIndicator" class="status-badge status-idle">Mic Off</span>
-                <button id="btnMicToggle" class="btn btn-primary">
-                    <span class="icon">🎤</span> Enable Microphone
-                </button>
+            <!-- Audio Input Routing & Microphone Selector -->
+            <div class="audio-routing-rack">
+                <div class="jack-socket" title="Hardware Input Socket"></div>
+                <div style="display: flex; flex-direction: column; gap: 3px;">
+                    <span class="module-header-tag">Audio Input Source</span>
+                    <select id="selectAudioInput" class="select-hardware" title="Select Audio Input Interface / Microphone">
+                        <option value="default">Default Input (Microphone)</option>
+                    </select>
+                </div>
+                <span id="micStatusIndicator" class="toggle-switch-btn" style="pointer-events: none; opacity: 0.85;">
+                    <span class="jewel-led" style="width: 8px; height: 8px;"></span> Standby
+                </span>
             </div>
         </header>
 
-        <!-- 2. Fretboard Visualizer (22 Frets with Gauge-varying strings & Inlays) -->
-        <section class="visualizer-card">
-            <div class="card-header">
-                <div class="card-title">
-                    <span>Fretboard Visualizer</span>
-                    <span class="tag">22 Frets • 6 Strings • Neon Indicators</span>
-                </div>
-                <div class="guide-item">
-                    <span style="font-size: 11px; color: var(--text-muted);">💡 Click or tap any fret/string to pluck</span>
-                </div>
-            </div>
-            <div class="canvas-viewport">
-                <canvas id="fretboardCanvas"></canvas>
-            </div>
-        </section>
+        <!-- 2. MASTER CONTROL BAR: Stomp Switch, BPM Slider, Quantize, Pedal Tuner -->
+        <section class="chassis-panel master-control-bar">
+            <div class="screw screw-tl"></div>
+            <div class="screw screw-tr"></div>
+            <div class="screw screw-bl"></div>
+            <div class="screw screw-br"></div>
 
-        <!-- 3. Auto-Scrolling Tablature Staff (6 Strings, Measure Bars, Playhead) -->
-        <section class="visualizer-card">
-            <div class="card-header">
-                <div class="card-title">
-                    <span>Auto-Scrolling Tablature Staff</span>
-                    <span class="tag">4/4 Metronome • 60 FPS • Real-time Recording</span>
-                </div>
-                <div style="font-size: 11px; color: var(--text-secondary); display: flex; gap: 12px; align-items: center;">
-                    <span>Time: <strong>4/4</strong></span>
-                    <span style="color: var(--neon-cyan);">▶ Live Playhead</span>
-                </div>
-            </div>
-            <div class="canvas-viewport">
-                <canvas id="tablatureCanvas"></canvas>
-            </div>
-        </section>
-
-        <!-- 4. Control Toolbar & Parameters Dock -->
-        <section class="control-dock">
-            <!-- Playback, Synthesis & Staff Scroll -->
-            <div class="control-group">
-                <button id="btnPlayBack" class="btn btn-accent" title="Read generated tablature and play it back audibly with animated playhead scrubbing">
-                    <span class="icon">▶️</span> Play Back
+            <!-- Start/Pause Listening Footswitch -->
+            <div class="stomp-switch-wrap">
+                <button id="btnMicToggle" class="stomp-button" title="Engage / Disengage Real-Time Microphone Pitch DSP">
+                    <span id="listenLed" class="jewel-led"></span>
+                    <span id="btnMicLabel">Start Listening</span>
                 </button>
-                <button id="btnPlayPause" class="btn" title="Pause or resume auto-scrolling staff">
-                    <span class="icon">⏸</span> Pause Scroll
-                </button>
-                <button id="btnRewind" class="btn" title="Rewind timeline to measure 1">
-                    <span class="icon">⏮</span> Rewind
-                </button>
-                <button id="btnClearTab" class="btn" title="Clear all recorded tablature notes">
-                    <span class="icon">🗑</span> Clear
-                </button>
-                <span class="group-label">Synth</span>
-                <select id="selectSynthSound" class="select-input" title="Playback Audio Synthesis Engine">
-                    <option value="karplus">Karplus-Strong String</option>
-                    <option value="polysynth">Poly Clean Synth</option>
-                </select>
             </div>
 
-            <!-- Rhythm & Quantization -->
-            <div class="control-group">
-                <span class="group-label">Quantize</span>
-                <select id="selectQuantizeGrid" class="select-input" title="Rhythm Quantization Grid">
+            <div class="cluster-separator"></div>
+
+            <!-- Metronome BPM Slider & Pulse -->
+            <div class="metronome-module">
+                <span class="module-header-tag">Metronome</span>
+                <div class="bpm-controls-group">
+                    <button id="btnBpmMinus" class="bpm-step-btn" title="Decrease BPM">-</button>
+                    <span id="bpmDisplay" class="bpm-readout-badge">120 BPM</span>
+                    <button id="btnBpmPlus" class="bpm-step-btn" title="Increase BPM">+</button>
+                    <input type="range" id="bpmSlider" min="40" max="240" value="120" step="1" title="Adjust Tempo (40-240 BPM)" style="width: 100px;">
+                </div>
+                <button id="btnTapTempo" class="toggle-switch-btn" title="Tap Tempo">Tap</button>
+                <button id="btnMetronomeSound" class="toggle-switch-btn active" title="Toggle Audible Metronome Click">
+                    <span class="icon">🔔</span> Click ON
+                </button>
+                <div class="digital-display" style="padding: 4px 10px; display: flex; align-items: center; gap: 8px;" title="4/4 Beat Counter">
+                    <div id="metronomePulse" class="metronome-pulse-led"></div>
+                    <span id="metronomeBeatDisplay" style="font-size: 11px; font-weight: 700; color: var(--text-secondary); min-width: 72px;">M1 : Beat 1</span>
+                </div>
+            </div>
+
+            <div class="cluster-separator"></div>
+
+            <!-- Quantize Sensitivity Toggle -->
+            <div class="quantize-module">
+                <span class="module-header-tag">Quantize</span>
+                <select id="selectQuantizeGrid" class="select-hardware" title="Quantization Grid Subdivision">
                     <option value="none">Off (Raw Timestamps)</option>
                     <option value="16th" selected>1/16 Note (Sixteenth)</option>
                     <option value="8th">1/8 Note (Eighth)</option>
@@ -129,108 +122,569 @@
                     <option value="eighthTriplet">1/8 Note Triplet</option>
                     <option value="quarter">1/4 Note (Quarter)</option>
                 </select>
-                <button id="btnQuantizeNow" class="btn" title="Quantize current recorded tab notes to selected grid">
-                    <span class="icon">⚡</span> Quantize Tab
+                <button id="btnLiveQuantize" class="toggle-switch-btn" title="Toggle Real-Time Quantization">
+                    <span>🎯</span> Live: OFF
                 </button>
-                <button id="btnLiveQuantize" class="btn" title="Toggle real-time quantization for incoming notes">
-                    <span class="icon">🎯</span> Live: OFF
+                <button id="btnQuantizeNow" class="toggle-switch-btn" title="Quantize Recorded Notes Now">
+                    <span>⚡</span> Quantize Tab
                 </button>
             </div>
 
-            <!-- Tempo & Metronome -->
-            <div class="control-group">
-                <span class="group-label">Tempo</span>
-                <button id="btnBpmMinus" class="btn btn-icon-only">-</button>
-                <div class="slider-container">
-                    <input type="range" id="bpmSlider" min="40" max="240" value="120" step="1">
-                    <span id="bpmDisplay" class="val-badge">120 BPM</span>
+            <div class="cluster-separator"></div>
+
+            <!-- Boutique Pedal Tuner Display -->
+            <div class="pedal-tuner-display" title="Chromatic Pedal Tuner HUD">
+                <div class="tuner-note-group">
+                    <div id="noteBadge" class="tuner-note-badge">--</div>
+                    <div id="freqDisplay" class="tuner-freq-display">0.0 Hz</div>
                 </div>
-                <button id="btnBpmPlus" class="btn btn-icon-only">+</button>
-                <button id="btnTapTempo" class="btn">Tap</button>
-                <button id="btnMetronomeSound" class="btn active" title="Toggle Metronome Audio Click">
-                    <span class="icon">🔔</span> Click ON
+
+                <div class="tuner-meter-assembly">
+                    <div class="tuner-flat-sharp-arrows">
+                        <span id="tunerFlatArrow">◀ FLAT</span>
+                        <span id="centsDisplay" class="cents-readout">0¢</span>
+                        <span id="tunerSharpArrow">SHARP ▶</span>
+                    </div>
+                    <div class="needle-arc-track">
+                        <div class="center-lock-target"></div>
+                        <div id="tunerNeedle" class="needle-indicator"></div>
+                    </div>
+                </div>
+
+                <!-- Ergonomic Hand Position Anchor -->
+                <div id="handPosBadge" class="hand-position-pill" title="Adaptive Hand Position Anchor">Pos: Fret 1</div>
+            </div>
+        </section>
+
+        <!-- 3. MAIN STAGE: Upper Fretboard, Middle Tablature, Lower FFT Heatmap -->
+        <main class="main-stage">
+            <!-- 3.1 Upper Section: Full 22-Fret Interactive Illuminated Fretboard -->
+            <section class="chassis-panel stage-card">
+                <div class="screw screw-tl"></div>
+                <div class="screw screw-tr"></div>
+                <div class="screw screw-bl"></div>
+                <div class="screw screw-br"></div>
+
+                <div class="stage-header">
+                    <div class="stage-title">
+                        <span>22-Fret Illuminated Fretboard</span>
+                        <span class="stage-tag">6 Strings • Nickel Frets • Neon Pluck Engine</span>
+                    </div>
+                    <div class="stage-tools">
+                        <span class="module-header-tag">Tuning:</span>
+                        <select id="selectTuning" class="select-hardware">
+                            <option value="standard">Standard (E A D G B e)</option>
+                            <option value="dropD">Drop D (D A D G B e)</option>
+                            <option value="dadgad">DADGAD (D A D G A d)</option>
+                            <option value="openD">Open D (D A D F# A d)</option>
+                            <option value="openG">Open G (D G D G B d)</option>
+                            <option value="halfStep">Half-Step Down (Eb Ab Db Gb Bb eb)</option>
+                        </select>
+
+                        <span class="module-header-tag">Register:</span>
+                        <select id="selectErgoMode" class="select-hardware">
+                            <option value="adaptive">Adaptive Hand Position</option>
+                            <option value="open">Open Position (Frets 0-4)</option>
+                            <option value="mid">Mid-Neck Box (Frets 5-9)</option>
+                            <option value="high">Lead Register (Frets 10-22)</option>
+                        </select>
+
+                        <span class="module-header-tag" title="Noise Gate RMS Threshold">Gate:</span>
+                        <input type="range" id="noiseGateSlider" min="0.002" max="0.050" value="0.008" step="0.002" style="width: 70px;">
+                        <span id="noiseGateVal" class="digital-display" style="padding: 2px 6px; font-size: 10px; color: var(--text-secondary);">0.008</span>
+                    </div>
+                </div>
+
+                <div class="canvas-frame">
+                    <canvas id="fretboardCanvas"></canvas>
+                </div>
+            </section>
+
+            <!-- 3.2 Middle Section: Auto-Scrolling Tablature Staff with Transport Controls -->
+            <section class="chassis-panel stage-card">
+                <div class="screw screw-tl"></div>
+                <div class="screw screw-tr"></div>
+                <div class="screw screw-bl"></div>
+                <div class="screw screw-br"></div>
+
+                <!-- Tablature Transport Controls Dock -->
+                <div class="tab-transport-bar">
+                    <div class="transport-buttons-group">
+                        <button id="btnPlayBack" class="transport-btn btn-play-action" title="Synthesize and play recorded score with animated playhead">
+                            <span>▶</span> Play Back
+                        </button>
+                        <button id="btnPlayPause" class="transport-btn" title="Pause or resume auto-scrolling timeline">
+                            <span>⏸</span> Pause Scroll
+                        </button>
+                        <button id="btnRewind" class="transport-btn" title="Rewind playhead to measure 1">
+                            <span>⏮</span> Rewind
+                        </button>
+                        <button id="btnClearTab" class="transport-btn" title="Clear all recorded tablature notes">
+                            <span>🗑</span> Clear Tab
+                        </button>
+                        <button id="btnLoopTab" class="transport-btn btn-loop" title="Toggle Continuous Score Looping">
+                            <span>🔁</span> Loop: OFF
+                        </button>
+                    </div>
+
+                    <div class="transport-buttons-group">
+                        <span class="module-header-tag">Synth Engine:</span>
+                        <select id="selectSynthSound" class="select-hardware" title="Playback Synthesis Model">
+                            <option value="karplus">Karplus-Strong String</option>
+                            <option value="polysynth">Poly Clean Synth</option>
+                        </select>
+
+                        <span class="module-header-tag">Staff Zoom:</span>
+                        <input type="range" id="zoomSlider" min="60" max="200" value="105" step="5" style="width: 80px;" title="Tab Spacing Zoom">
+                    </div>
+                </div>
+
+                <div class="canvas-frame">
+                    <canvas id="tablatureCanvas"></canvas>
+                </div>
+            </section>
+
+            <!-- 3.3 Lower Section: Real-Time FFT Spectral Heat-Map & Harmonic Overtones -->
+            <section class="chassis-panel stage-card">
+                <div class="screw screw-tl"></div>
+                <div class="screw screw-tr"></div>
+                <div class="screw screw-bl"></div>
+                <div class="screw screw-br"></div>
+
+                <div class="stage-header">
+                    <div class="stage-title">
+                        <span>Real-Time FFT Spectral Heat-Map</span>
+                        <span class="stage-tag">60 FPS • Harmonic Overtones (f₀, 2f₀, 3f₀, 4f₀) • Waterfall Spectrogram</span>
+                    </div>
+                    <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); display: flex; gap: 14px; align-items: center;">
+                        <span><strong style="color: var(--led-cyan);">f₀</strong> Fundamental</span>
+                        <span><strong style="color: var(--led-amber);">2f₀</strong> Octave</span>
+                        <span><strong style="color: #10b981;">3f₀</strong> 5th Overtone</span>
+                    </div>
+                </div>
+
+                <div class="canvas-frame">
+                    <canvas id="spectralCanvas"></canvas>
+                </div>
+            </section>
+
+            <!-- 3.4 High-Precision Virtual Strobe Tuner & Acoustic Inharmonicity Analyzer -->
+            <section class="chassis-panel stage-card strobe-analyzer-panel">
+                <div class="screw screw-tl"></div>
+                <div class="screw screw-tr"></div>
+                <div class="screw screw-bl"></div>
+                <div class="screw screw-br"></div>
+
+                <div class="stage-header">
+                    <div class="stage-title">
+                        <span>High-Precision Virtual Strobe Tuner & Acoustic Inharmonicity Analyzer</span>
+                        <span class="stage-tag">Dual Concentric Rings • 0.1¢ Precision • String Stiffness: fₙ = n·f₀·√(1 + B·n²)</span>
+                    </div>
+                    <div class="strobe-header-controls">
+                        <span class="module-header-tag">Tuning:</span>
+                        <select id="selectStrobeTuning" class="select-hardware">
+                            <option value="standard">Standard (E A D G B e)</option>
+                            <option value="dropD">Drop D (D A D G B e)</option>
+                            <option value="dadgad">DADGAD (D A D G A d)</option>
+                            <option value="openD">Open D (D A D F# A d)</option>
+                            <option value="openG">Open G (D G D G B d)</option>
+                            <option value="halfStep">Half-Step Down (Eb Ab Db Gb Bb eb)</option>
+                        </select>
+
+                        <span class="module-header-tag">String:</span>
+                        <select id="selectStrobeString" class="select-hardware">
+                            <option value="0">Auto-Detect String</option>
+                            <option value="6">String 6 (Low E)</option>
+                            <option value="5">String 5 (A)</option>
+                            <option value="4">String 4 (D)</option>
+                            <option value="3">String 3 (G)</option>
+                            <option value="2">String 2 (B)</option>
+                            <option value="1">String 1 (High e)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="strobe-analyzer-grid">
+                    <!-- Left: Virtual Strobe Wheel Canvas -->
+                    <div class="strobe-canvas-container">
+                        <canvas id="strobeCanvas" width="340" height="340"></canvas>
+                        <div class="strobe-legend">
+                            <div><strong style="color: #00f3ff;">Outer Ring:</strong> Fundamental (f₀) Strobe (Clockwise = Sharp, CCW = Flat, 0.1¢)</div>
+                            <div><strong style="color: #10b981;">Inner Ring:</strong> 2nd Harmonic (2f₀) Strobe (Drifts faster with high stiffness B)</div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Inharmonicity & String Wear Analysis Dashboard -->
+                    <div class="inharmonicity-dashboard">
+                        <!-- Wear Meter / Inharmonicity Factor Gauge -->
+                        <div class="inharm-card">
+                            <div class="inharm-header">
+                                <span class="module-header-tag">Acoustic String Wear / Inharmonicity Factor Gauge</span>
+                                <span id="stringWearBadge" class="wear-badge wear-fresh">Fresh String (Studio Quality)</span>
+                            </div>
+
+                            <div class="gauge-bar-track">
+                                <div id="inharmGaugeFill" class="gauge-bar-fill" style="width: 25%;"></div>
+                                <div class="gauge-markers">
+                                    <span class="marker marker-fresh">Fresh (&lt; 0.25m)</span>
+                                    <span class="marker marker-good">Good (0.25-0.55m)</span>
+                                    <span class="marker marker-aged">Aged (0.55-1.10m)</span>
+                                    <span class="marker marker-worn">Worn (&gt; 1.10m)</span>
+                                </div>
+                            </div>
+
+                            <div class="inharm-metrics-grid">
+                                <div class="metric-box">
+                                    <span class="metric-label">Inharmonicity (B)</span>
+                                    <span id="inharmBVal" class="metric-val">0.00 × 10⁻³</span>
+                                </div>
+                                <div class="metric-box">
+                                    <span class="metric-label">Fit Goodness (R²)</span>
+                                    <span id="inharmR2Val" class="metric-val">100.0%</span>
+                                </div>
+                                <div class="metric-box">
+                                    <span class="metric-label">Fundamental (f₀)</span>
+                                    <span id="inharmF0Val" class="metric-val">82.4 Hz</span>
+                                </div>
+                                <div class="metric-box">
+                                    <span class="metric-label">Pitch Deviation</span>
+                                    <span id="strobeCentsReadout" class="metric-val">0.0 ¢</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- First 4 Spectral Peaks Breakdown -->
+                        <div class="inharm-card">
+                            <div class="inharm-header">
+                                <span class="module-header-tag">First 4 Spectral Peaks (Dispersive Stiffness: fₙ = n·f₀·√(1+B·n²))</span>
+                            </div>
+                            <div class="peaks-table-wrap">
+                                <table class="peaks-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Mode (n)</th>
+                                            <th>Ideal Harmonic</th>
+                                            <th>Measured Peak</th>
+                                            <th>Stiffness Shift (Δf)</th>
+                                            <th>Cent Deviation</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="peaksTableBody">
+                                        <tr><td>1 (f₁)</td><td>82.41 Hz</td><td>82.41 Hz</td><td>+0.00 Hz</td><td>+0.0 ¢</td></tr>
+                                        <tr><td>2 (f₂)</td><td>164.82 Hz</td><td>164.83 Hz</td><td>+0.01 Hz</td><td>+0.1 ¢</td></tr>
+                                        <tr><td>3 (f₃)</td><td>247.22 Hz</td><td>247.26 Hz</td><td>+0.04 Hz</td><td>+0.3 ¢</td></tr>
+                                        <tr><td>4 (f₄)</td><td>329.63 Hz</td><td>329.74 Hz</td><td>+0.11 Hz</td><td>+0.6 ¢</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Interactive Synthetic Acoustic Pluck Engine for Instant Testing -->
+                        <div class="inharm-card">
+                            <div class="inharm-header">
+                                <span class="module-header-tag">Acoustic Physics Simulator (Test Strobe &amp; Inharmonicity Without Mic)</span>
+                            </div>
+                            <div class="pluck-buttons-row">
+                                <button id="btnPluckFresh" class="pluck-btn" title="Simulate fresh string with negligible stiffness (B = 0.00015)">
+                                    <span class="dot fresh-dot"></span> Pluck Fresh (B = 1.5×10⁻⁴)
+                                </button>
+                                <button id="btnPluckNormal" class="pluck-btn" title="Simulate normal playable string (B = 0.00035)">
+                                    <span class="dot normal-dot"></span> Pluck Good (B = 3.5×10⁻⁴)
+                                </button>
+                                <button id="btnPluckWorn" class="pluck-btn" title="Simulate old fatigued string with heavy inharmonicity (B = 0.00120)">
+                                    <span class="dot worn-dot"></span> Pluck Worn (B = 1.2×10⁻³)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3.4 Guitar Effects Rack (Stompbox Chain & Split Routing) -->
+            <section class="chassis-panel effects-rack-chassis">
+                <div class="screw screw-tl"></div>
+                <div class="screw screw-tr"></div>
+                <div class="screw screw-bl"></div>
+                <div class="screw screw-br"></div>
+
+                <div class="effects-rack-header">
+                    <div class="effects-rack-title-group">
+                        <span class="effects-rack-icon">🎛️</span>
+                        <div>
+                            <div class="effects-rack-title">Guitar Effects Rack • Stompbox Chain</div>
+                            <div style="font-size: 11px; color: var(--text-muted);">Real-Time Native Web Audio API DSP • True-Bypass Crossfades</div>
+                        </div>
+                        <span class="effects-rack-badge">Split Signal Architecture</span>
+                    </div>
+
+                    <!-- Split Signal Routing Indicator -->
+                    <div class="split-routing-hud" title="Audio routing topology preserving pitch tracking fidelity">
+                        <div class="routing-tap">
+                            <span class="routing-tap-dot raw"></span>
+                            <span>Raw Tap: Pitch Analyser</span>
+                        </div>
+                        <span style="color: #4b5563;">|</span>
+                        <div class="routing-tap">
+                            <span class="routing-tap-dot wet"></span>
+                            <span>Wet DSP: Overdrive → Delay → Reverb → Destination</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pedalboard Grid -->
+                <div class="pedalboard-grid">
+                    <!-- 1. Tube Screamer / Overdrive Pedal -->
+                    <div class="stompbox-pedal pedal-overdrive" id="pedalOverdrive">
+                        <div class="pedal-top-row">
+                            <div class="pedal-branding">
+                                <span class="pedal-name">Tube Screamer</span>
+                                <span class="pedal-subtitle">Triode Saturation TS-808</span>
+                            </div>
+                            <div id="odLed" class="pedal-jewel-led active" title="Overdrive Status LED"></div>
+                        </div>
+
+                        <div class="pedal-controls">
+                            <!-- Drive Control -->
+                            <div class="pedal-knob-group">
+                                <div class="pedal-knob-header">
+                                    <span>Drive</span>
+                                    <span id="odDriveVal" class="pedal-val-badge">45</span>
+                                </div>
+                                <input type="range" id="odDriveSlider" class="pedal-slider" min="0" max="100" value="45" title="Asymmetric non-linear sigmoid saturation level">
+                            </div>
+
+                            <!-- Tone Tilt Filter Control -->
+                            <div class="pedal-knob-group">
+                                <div class="pedal-knob-header">
+                                    <span>Tone</span>
+                                    <span id="odToneVal" class="pedal-val-badge">2280 Hz</span>
+                                </div>
+                                <input type="range" id="odToneSlider" class="pedal-slider" min="0" max="100" value="50" title="Biquad low-pass tilt filter cutoff (800Hz - 6500Hz)">
+                            </div>
+
+                            <!-- Output Level Control -->
+                            <div class="pedal-knob-group">
+                                <div class="pedal-knob-header">
+                                    <span>Level</span>
+                                    <span id="odLevelVal" class="pedal-val-badge">70%</span>
+                                </div>
+                                <input type="range" id="odLevelSlider" class="pedal-slider" min="0" max="100" value="70" title="Pedal output gain stage">
+                            </div>
+                        </div>
+
+                        <!-- Stompbox Footswitch Bay -->
+                        <div class="pedal-footswitch-bay">
+                            <button id="btnOdStomp" class="pedal-footswitch" title="Toggle Overdrive True-Bypass"></button>
+                            <span id="odBypassStatus" class="pedal-switch-status active">ENGAGED</span>
+                        </div>
+                    </div>
+
+                    <!-- 2. Analog BBD Delay Pedal -->
+                    <div class="stompbox-pedal pedal-delay" id="pedalDelay">
+                        <div class="pedal-top-row">
+                            <div class="pedal-branding">
+                                <span class="pedal-name">Analog BBD Delay</span>
+                                <span class="pedal-subtitle">MN3005 Bucket-Brigade</span>
+                            </div>
+                            <div id="delayLed" class="pedal-jewel-led active" title="BBD Delay Status LED"></div>
+                        </div>
+
+                        <div class="pedal-controls">
+                            <!-- Delay Time Control -->
+                            <div class="pedal-knob-group">
+                                <div class="pedal-knob-header">
+                                    <span>Time</span>
+                                    <span id="delayTimeVal" class="pedal-val-badge">350 ms</span>
+                                </div>
+                                <input type="range" id="delayTimeSlider" class="pedal-slider" min="20" max="1000" value="350" step="5" title="Delay buffer time (20ms - 1000ms)">
+                            </div>
+
+                            <!-- Feedback Loop Control -->
+                            <div class="pedal-knob-group">
+                                <div class="pedal-knob-header">
+                                    <span title="Feedback clamped to 90% max for digital stability">Repeats</span>
+                                    <span id="delayFeedbackVal" class="pedal-val-badge">42%</span>
+                                </div>
+                                <input type="range" id="delayFeedbackSlider" class="pedal-slider" min="0" max="90" value="42" title="BBD feedback repeats (0-90% safe clamp)">
+                            </div>
+
+                            <!-- Wet/Dry Mix Control -->
+                            <div class="pedal-knob-group">
+                                <div class="pedal-knob-header">
+                                    <span>Mix</span>
+                                    <span id="delayMixVal" class="pedal-val-badge">35%</span>
+                                </div>
+                                <input type="range" id="delayMixSlider" class="pedal-slider" min="0" max="100" value="35" title="Equal-power wet/dry delay crossfade">
+                            </div>
+                        </div>
+
+                        <!-- Stompbox Footswitch Bay -->
+                        <div class="pedal-footswitch-bay">
+                            <button id="btnDelayStomp" class="pedal-footswitch" title="Toggle Analog Delay True-Bypass"></button>
+                            <span id="delayBypassStatus" class="pedal-switch-status active">ENGAGED</span>
+                        </div>
+                    </div>
+
+                    <!-- 3. Studio Ambient Reverb Pedal -->
+                    <div class="stompbox-pedal pedal-reverb" id="pedalReverb">
+                        <div class="pedal-top-row">
+                            <div class="pedal-branding">
+                                <span class="pedal-name">Ambient Reverb</span>
+                                <span class="pedal-subtitle">Spring Tank / Plate Convolver</span>
+                            </div>
+                            <div id="reverbLed" class="pedal-jewel-led active" title="Reverb Status LED"></div>
+                        </div>
+
+                        <div class="pedal-controls">
+                            <!-- Reverb Decay Size Control -->
+                            <div class="pedal-knob-group">
+                                <div class="pedal-knob-header">
+                                    <span>Size</span>
+                                    <span id="reverbSizeVal" class="pedal-val-badge">2.2s</span>
+                                </div>
+                                <input type="range" id="reverbSizeSlider" class="pedal-slider" min="0.5" max="4.0" value="2.2" step="0.1" title="Synthetic impulse response decay duration (0.5s - 4.0s)">
+                            </div>
+
+                            <!-- High-Frequency Damping Control -->
+                            <div class="pedal-knob-group">
+                                <div class="pedal-knob-header">
+                                    <span>Damping</span>
+                                    <span id="reverbDampingVal" class="pedal-val-badge">55%</span>
+                                </div>
+                                <input type="range" id="reverbDampingSlider" class="pedal-slider" min="0" max="100" value="55" title="Time-varying high-frequency acoustic absorption">
+                            </div>
+
+                            <!-- Wet/Dry Mix Control -->
+                            <div class="pedal-knob-group">
+                                <div class="pedal-knob-header">
+                                    <span>Mix</span>
+                                    <span id="reverbMixVal" class="pedal-val-badge">30%</span>
+                                </div>
+                                <input type="range" id="reverbMixSlider" class="pedal-slider" min="0" max="100" value="30" title="Equal-power wet/dry reverb crossfade">
+                            </div>
+                        </div>
+
+                        <!-- Stompbox Footswitch Bay -->
+                        <div class="pedal-footswitch-bay">
+                            <button id="btnReverbStomp" class="pedal-footswitch" title="Toggle Ambient Reverb True-Bypass"></button>
+                            <span id="reverbBypassStatus" class="pedal-switch-status active">ENGAGED</span>
+                        </div>
+                    </div>
+
+                    <!-- 4. Master Control & Routing Bay -->
+                    <div class="stompbox-pedal pedal-master" id="pedalMaster">
+                        <div class="pedal-top-row">
+                            <div class="pedal-branding">
+                                <span class="pedal-name">Master Output</span>
+                                <span class="pedal-subtitle">Routing & Monitor Bay</span>
+                            </div>
+                            <div id="masterLed" class="pedal-jewel-led active" title="Master Rack Status LED"></div>
+                        </div>
+
+                        <div class="pedal-controls">
+                            <!-- Master Volume Control -->
+                            <div class="pedal-knob-group">
+                                <div class="pedal-knob-header">
+                                    <span>Master Vol</span>
+                                    <span id="masterVolumeVal" class="pedal-val-badge">85%</span>
+                                </div>
+                                <input type="range" id="masterVolumeSlider" class="pedal-slider" min="0" max="100" value="85" title="Master output stage level to destination">
+                            </div>
+
+                            <!-- Route Options -->
+                            <div class="master-options-grid" style="margin-top: 4px;">
+                                <button id="btnMonitorSpeakers" class="master-toggle-btn" title="Toggle Speaker/Headphone monitoring (Safety muted by default for mic to prevent acoustic feedback)">
+                                    <span>🔊 Speaker Monitor</span>
+                                    <span id="monitorStatusText" style="font-family: var(--font-mono); font-size: 10px;">OFF</span>
+                                </button>
+                                <button id="btnRouteSynthToFx" class="master-toggle-btn active" title="Route Tablature Synthesizer & Demo Riffs through the Guitar Effects Rack">
+                                    <span>🎸 Synth to FX</span>
+                                    <span id="synthFxStatusText" style="font-family: var(--font-mono); font-size: 10px; color: var(--led-cyan);">ON</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Stompbox Footswitch Bay -->
+                        <div class="pedal-footswitch-bay">
+                            <button id="btnMasterStomp" class="pedal-footswitch" title="Master True-Bypass: completely bypass all stompbox pedals"></button>
+                            <span id="masterBypassStatus" class="pedal-switch-status active">RACK ENGAGED</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- 4. ACTION TRAY: Export ASCII Tab, Download MIDI, Copy Link, Demo Riffs -->
+        <section class="chassis-panel action-tray">
+            <div class="screw screw-tl"></div>
+            <div class="screw screw-tr"></div>
+            <div class="screw screw-bl"></div>
+            <div class="screw screw-br"></div>
+
+            <div class="action-tray-group">
+                <button id="btnExportAsciiQuick" class="action-btn action-btn-primary" title="Export formatted ASCII tablature directly to clipboard & preview">
+                    <span>📄</span> Export ASCII Tab
+                </button>
+                <button id="btnDownloadMidiQuick" class="action-btn action-btn-accent" title="Generate and download pure client-side binary Standard MIDI File (.mid)">
+                    <span>🎹</span> Download MIDI
+                </button>
+                <button id="btnShareLink" class="action-btn" title="Create shareable compressed URL link containing this riff">
+                    <span>🔗</span> Copy Shareable Link
+                </button>
+                <button id="btnOpenExportModal" class="action-btn" title="Open Multi-Format Exporter Suite (MusicXML, JSON, ASCII, MIDI)">
+                    <span>📤</span> Export Suite...
                 </button>
             </div>
 
-            <!-- Tab Zoom -->
-            <div class="control-group">
-                <span class="group-label">Zoom</span>
-                <input type="range" id="zoomSlider" min="60" max="200" value="105" step="5">
-            </div>
-
-            <!-- Tuning & Ergonomics -->
-            <div class="control-group">
-                <span class="group-label">Tuning</span>
-                <select id="selectTuning" class="select-input">
-                    <option value="standard">Standard (E A D G B e)</option>
-                    <option value="dropD">Drop D (D A D G B e)</option>
-                    <option value="halfStep">Half-Step Down (Eb Ab Db Gb Bb eb)</option>
-                    <option value="dadgad">DADGAD (D A D G A d)</option>
-                </select>
-
-                <span class="group-label">Ergonomics</span>
-                <select id="selectErgoMode" class="select-input">
-                    <option value="adaptive">Adaptive Hand Position</option>
-                    <option value="open">Open Position (Frets 0-4)</option>
-                    <option value="mid">Mid-Neck Box (Frets 5-9)</option>
-                    <option value="high">Lead Register (Frets 10-22)</option>
-                </select>
-            </div>
-
-            <!-- Noise Gate -->
-            <div class="control-group">
-                <span class="group-label" title="Minimum signal level to trigger note plucks">Noise Gate</span>
-                <input type="range" id="noiseGateSlider" min="0.002" max="0.050" value="0.008" step="0.002">
-                <span id="noiseGateVal" class="val-badge" style="min-width: 45px;">0.008</span>
-            </div>
-
-            <!-- Demo Riffs & Multi-Format Exporter -->
-            <div class="control-group">
-                <span class="group-label">Demo Riffs</span>
-                <select id="selectDemoSong" class="select-input">
+            <div class="action-tray-group">
+                <span class="module-header-tag">Demo Riffs:</span>
+                <select id="selectDemoSong" class="select-hardware" style="max-width: 220px;">
                     <option value="sweetChild">Sweet Child O' Mine (Slash)</option>
                     <option value="smokeOnWater">Smoke On The Water (Deep Purple)</option>
                     <option value="pentatonicRun">A Minor Pentatonic Box (Frets 5-8)</option>
                     <option value="nothingElseMatters">Nothing Else Matters (Metallica)</option>
                 </select>
-                <button id="btnPlayDemo" class="btn btn-primary">
-                    <span class="icon">▶</span> Play Demo
-                </button>
-                <button id="btnOpenExportModal" class="btn btn-accent" title="Export to ASCII, MusicXML, JSON, or MIDI">
-                    <span class="icon">📤</span> Export Score...
+                <button id="btnPlayDemo" class="action-btn" title="Load and playback iconic guitar riff">
+                    <span>▶</span> Play Demo
                 </button>
             </div>
         </section>
 
         <!-- 5. Keyboard Shortcut Guide & Tips -->
-        <footer class="keyboard-guide-card">
-            <div class="guide-items">
-                <div class="guide-item">
-                    <span class="group-label">Virtual Plucks:</span>
-                    <kbd>1</kbd>–<kbd>6</kbd> <span>Open Strings (e to E)</span>
+        <footer class="keyboard-guide-bar">
+            <div class="guide-keys-list">
+                <div class="guide-key-item">
+                    <span style="font-weight: 700; color: var(--text-muted);">Virtual Plucks:</span>
+                    <kbd>1</kbd>–<kbd>6</kbd> <span>Open Strings</span>
                 </div>
-                <div class="guide-item">
+                <div class="guide-key-item">
                     <kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><kbd>F</kbd><kbd>G</kbd><kbd>H</kbd><kbd>J</kbd><kbd>K</kbd>
-                    <span>Pentatonic Scale Run</span>
+                    <span>Pentatonic Scale</span>
                 </div>
-                <div class="guide-item">
-                    <kbd>Space</kbd> <span>Play/Pause Scroll</span>
+                <div class="guide-key-item">
+                    <kbd>Space</kbd> <span>Scroll Pause</span>
                 </div>
-                <div class="guide-item">
-                    <kbd>P</kbd> <span>Play Back Synth</span>
+                <div class="guide-key-item">
+                    <kbd>P</kbd> <span>Synth Playback</span>
                 </div>
-                <div class="guide-item">
+                <div class="guide-key-item">
+                    <kbd>L</kbd> <span>Toggle Loop</span>
+                </div>
+                <div class="guide-key-item">
                     <kbd>Q</kbd> <span>Quantize Tab</span>
                 </div>
-                <div class="guide-item">
+                <div class="guide-key-item">
                     <kbd>R</kbd> <span>Rewind</span>
                 </div>
             </div>
             <div>
-                <span>Quantization + Karplus-Strong Audio Playback + Multi-Format Exporter (ASCII, MusicXML, JSON, MIDI)</span>
+                <span>FretDSP Studio • Real-Time Web Audio DSP & Karplus-Strong Physical String Synthesis</span>
             </div>
         </footer>
     </div>
+
+    <!-- Floating Toast Notification Container -->
+    <div id="toastContainer" class="toast-container"></div>
 
     <!-- 6. Multi-Format Tablature & Score Exporter Modal -->
     <div id="exportModal" class="modal-overlay">
@@ -240,7 +694,7 @@
                     <h3 class="modal-title">Export Guitar Score</h3>
                     <div style="font-size: 12px; color: var(--text-muted);">Compatible with Guitar Pro, MuseScore, TuxGuitar, and Digital Audio Workstations</div>
                 </div>
-                <button id="btnCloseModal" class="btn btn-icon-only">✕</button>
+                <button id="btnCloseModal" class="btn-icon-close">✕</button>
             </div>
 
             <!-- Format Tabs -->
@@ -258,8 +712,8 @@
                 </div>
                 <textarea id="asciiContent" class="modal-textarea" readonly></textarea>
                 <div class="modal-footer">
-                    <button id="btnCopyAscii" class="btn">Copy to Clipboard</button>
-                    <button id="btnDownloadAscii" class="btn btn-primary">Download .txt</button>
+                    <button id="btnCopyAscii" class="action-btn">Copy to Clipboard</button>
+                    <button id="btnDownloadAscii" class="action-btn action-btn-primary">Download .txt</button>
                 </div>
             </div>
 
@@ -270,8 +724,8 @@
                 </div>
                 <textarea id="musicxmlContent" class="modal-textarea" readonly></textarea>
                 <div class="modal-footer">
-                    <button id="btnCopyMusicXML" class="btn">Copy XML</button>
-                    <button id="btnDownloadMusicXML" class="btn btn-primary">Download .musicxml</button>
+                    <button id="btnCopyMusicXML" class="action-btn">Copy XML</button>
+                    <button id="btnDownloadMusicXML" class="action-btn action-btn-primary">Download .musicxml</button>
                 </div>
             </div>
 
@@ -282,8 +736,8 @@
                 </div>
                 <textarea id="jsonContent" class="modal-textarea" readonly></textarea>
                 <div class="modal-footer">
-                    <button id="btnCopyJSON" class="btn">Copy JSON</button>
-                    <button id="btnDownloadJSON" class="btn btn-primary">Download .json</button>
+                    <button id="btnCopyJSON" class="action-btn">Copy JSON</button>
+                    <button id="btnDownloadJSON" class="action-btn action-btn-primary">Download .json</button>
                 </div>
             </div>
 
@@ -301,8 +755,8 @@
                         <div class="midi-detail-item">Tempo<strong id="midiTempoDisplay">120 BPM</strong></div>
                         <div class="midi-detail-item">Total Notes<strong id="midiNotesDisplay">0</strong></div>
                     </div>
-                    <button id="btnDownloadMIDI" class="btn btn-accent" style="padding: 12px 28px; font-size: 14px;">
-                        <span class="icon">💾</span> Download .MID File
+                    <button id="btnDownloadMIDI" class="action-btn action-btn-accent" style="padding: 12px 28px; font-size: 14px;">
+                        <span>💾</span> Download .MID File
                     </button>
                 </div>
             </div>
@@ -310,13 +764,16 @@
     </div>
 
     <!-- Application Scripts -->
+    <script src="js/effects-rack.js"></script>
     <script src="js/dsp.js"></script>
+    <script src="js/strobe-tuner.js"></script>
     <script src="js/optimizer.js"></script>
     <script src="js/quantizer.js"></script>
     <script src="js/synth.js"></script>
     <script src="js/exporter.js"></script>
     <script src="js/fretboard.js"></script>
     <script src="js/tablature.js"></script>
+    <script src="js/spectral-visualizer.js"></script>
     <script src="js/demo-songs.js"></script>
     <script src="js/app.js"></script>
 </body>

@@ -37,6 +37,7 @@ class GuitarDSP {
         this.onNoteOff = options.onNoteOff || null;
         this.onSilence = options.onSilence || null;
         this.onWaveformData = options.onWaveformData || null;
+        this.onAudioMetrics = options.onAudioMetrics || null;
 
         // Buffers
         this.timeDomainBuffer = new Float32Array(this.bufferSize);
@@ -63,30 +64,62 @@ class GuitarDSP {
     }
 
     /**
-     * Connects physical microphone for live guitar analysis.
+     * Enumerates available audio input devices (microphones/interfaces).
      */
-    async startMicrophone() {
+    async getAudioInputDevices() {
+        if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+            return [];
+        }
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            return devices.filter(d => d.kind === 'audioinput');
+        } catch (err) {
+            console.warn("Could not enumerate audio devices:", err);
+            return [];
+        }
+    }
+
+    /**
+     * Connects physical microphone or audio interface for live guitar analysis.
+     * @param {string|null} deviceId - Specific audio input device ID
+     */
+    async startMicrophone(deviceId = null) {
         await this.initAudioContext();
 
         try {
+            const audioConstraints = {
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: false,
+                latency: 0
+            };
+            if (deviceId) {
+                audioConstraints.deviceId = { exact: deviceId };
+            }
+
             this.micStream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    echoCancellation: false,
-                    noiseSuppression: false,
-                    autoGainControl: false,
-                    latency: 0
-                }
+                audio: audioConstraints
             });
 
             this.sourceNode = this.audioCtx.createMediaStreamSource(this.micStream);
             
-            // Analyser node for time-domain extraction
+            // Analyser node for time-domain and frequency extraction
             this.analyser = this.audioCtx.createAnalyser();
             this.analyser.fftSize = this.bufferSize * 2;
             this.analyser.smoothingTimeConstant = 0.0;
             
-            // Connect to analyser (do not connect to audioCtx.destination to avoid mic feedback!)
+            // 1. Split signal routing: send raw/unprocessed audio to pitch detection analyser
+            // DSP effects do not alter or degrade pitch tracking accuracy
             this.sourceNode.connect(this.analyser);
+
+            // 2. Connect input to GuitarEffectsRack stompbox chain
+            if (typeof GuitarEffectsRack !== 'undefined') {
+                if (!this.effectsRack) {
+                    this.effectsRack = new GuitarEffectsRack(this.audioCtx, this.sourceNode);
+                } else {
+                    this.effectsRack.setSourceNode(this.sourceNode);
+                }
+            }
 
             this.isRunning = true;
             this.processAudioLoop();
@@ -98,10 +131,20 @@ class GuitarDSP {
     }
 
     /**
+     * Returns the active Web Audio AnalyserNode.
+     */
+    getAnalyser() {
+        return this.analyser;
+    }
+
+    /**
      * Stops microphone capture.
      */
     stopMicrophone() {
         this.isRunning = false;
+        if (this.effectsRack) {
+            this.effectsRack.setSourceNode(null);
+        }
         if (this.micStream) {
             this.micStream.getTracks().forEach(track => track.stop());
             this.micStream = null;
@@ -134,12 +177,26 @@ class GuitarDSP {
      * Analyzes a single frame of raw audio samples for pitch, RMS, and onset pluck.
      */
     analyzeFrame(buffer, currentTime) {
-        // 1. Calculate RMS Energy
+        // 1. Calculate RMS Energy and Peak Sample
         let sumSq = 0;
+        let peakSample = 0;
         for (let i = 0; i < buffer.length; i++) {
+            const abs = Math.abs(buffer[i]);
+            if (abs > peakSample) peakSample = abs;
             sumSq += buffer[i] * buffer[i];
         }
         const rms = Math.sqrt(sumSq / buffer.length);
+        const rmsDb = rms > 0.0001 ? 20 * Math.log10(rms / 0.707) : -96;
+        const isClipping = peakSample >= 0.96 || rms > 0.45;
+
+        if (this.onAudioMetrics) {
+            this.onAudioMetrics({
+                rms,
+                peakSample,
+                rmsDb,
+                isClipping
+            });
+        }
 
         // Check noise gate
         if (rms < this.noiseGateRMS) {
