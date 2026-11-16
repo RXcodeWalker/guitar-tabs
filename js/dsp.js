@@ -2,6 +2,9 @@
  * Audio DSP Engine (Phase 1)
  * Real-time guitar pitch detection, onset/pluck transient detector,
  * Karplus-Strong physical string synthesizer, and metronome timing engine.
+ * 
+ * Supports AudioWorkletProcessor offloading for glitch-free real-time pitch tracking,
+ * with graceful fallback to ScriptProcessor/AnalyserNode.
  */
 
 class GuitarDSP {
@@ -13,15 +16,22 @@ class GuitarDSP {
         this.micStream = null;
         this.sourceNode = null;
         this.scriptNode = null;
+        this.workletNode = null;
+        this.workletGain = null;
+        this.workletModuleLoaded = false;
+        this.useWorklet = false;
+        this.useScriptProcessor = options.useScriptProcessor || false;
+        this.workletPath = options.workletPath || 'js/pitch-processor.worklet.js';
+        this.pitchConfidenceThreshold = options.pitchConfidenceThreshold !== undefined ? options.pitchConfidenceThreshold : 0.65;
         this.isRunning = false;
 
         // Tuner & Pitch settings
         this.a4 = options.a4 || 440;
-        this.minFreq = 70.0;   // Below Low D (73.4 Hz)
-        this.maxFreq = 1350.0; // Above 22nd fret High E (D6 = 1175 Hz, E6 = 1318 Hz)
-        this.yinThreshold = 0.12; // YIN dip threshold
-        this.noiseGateRMS = 0.008; // Minimum RMS signal level
-        this.onsetThreshold = 0.015; // Sudden energy jump for pluck detection
+        this.minFreq = options.minFreq || 70.0;   // Below Low D (73.4 Hz)
+        this.maxFreq = options.maxFreq || 1350.0; // Above 22nd fret High E (D6 = 1175 Hz, E6 = 1318 Hz)
+        this.yinThreshold = options.yinThreshold !== undefined ? options.yinThreshold : 0.12; // YIN dip threshold
+        this.noiseGateRMS = options.noiseGateRMS !== undefined ? options.noiseGateRMS : 0.008; // Minimum RMS signal level
+        this.onsetThreshold = options.onsetThreshold !== undefined ? options.onsetThreshold : 0.015; // Sudden energy jump for pluck detection
 
         // State tracking
         this.prevRMS = 0;
@@ -54,16 +64,21 @@ class GuitarDSP {
      */
     async initAudioContext() {
         if (!this.audioCtx) {
-            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-            this.audioCtx = new AudioContextClass({
-                latencyHint: 'interactive',
-                sampleRate: this.sampleRate
-            });
+            const AudioContextClass = (typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext))
+                || (typeof AudioContext !== 'undefined' ? AudioContext : null);
+            if (AudioContextClass) {
+                this.audioCtx = new AudioContextClass({
+                    latencyHint: 'interactive',
+                    sampleRate: this.sampleRate
+                });
+            }
         }
-        if (this.audioCtx.state === 'suspended') {
+        if (this.audioCtx && this.audioCtx.state === 'suspended') {
             await this.audioCtx.resume();
         }
-        this.sampleRate = this.audioCtx.sampleRate;
+        if (this.audioCtx) {
+            this.sampleRate = this.audioCtx.sampleRate;
+        }
     }
 
     /**
@@ -84,6 +99,7 @@ class GuitarDSP {
 
     /**
      * Connects physical microphone or audio interface for live guitar analysis.
+     * Instantiates AudioWorkletProcessor off the main UI thread with graceful fallback.
      * @param {string|null} deviceId - Specific audio input device ID
      */
     async startMicrophone(deviceId = null) {
@@ -125,12 +141,193 @@ class GuitarDSP {
                 }
             }
 
+            // 3. AudioWorklet pitch processor initialization with fallback
+            await this.initWorkletNode();
+
             this.isRunning = true;
             this.processAudioLoop();
-            return { success: true };
+            return { success: true, useWorklet: this.useWorklet };
         } catch (err) {
             console.error("Microphone access failed:", err);
             return { success: false, error: err.message };
+        }
+    }
+
+    /**
+     * Initializes AudioWorkletNode off the main UI thread.
+     * Falls back gracefully to ScriptProcessor/AnalyserNode if blocked or unsupported.
+     */
+    async initWorkletNode() {
+        this.useWorklet = false;
+
+        // Check if AudioWorklet is supported
+        if (!this.audioCtx || !this.audioCtx.audioWorklet || typeof this.audioCtx.audioWorklet.addModule !== 'function') {
+            console.warn("AudioWorklet is not supported in this environment. Falling back to ScriptProcessor/AnalyserNode.");
+            this.initFallbackNode();
+            return;
+        }
+
+        try {
+            // Load the worklet module dynamically if not already registered
+            if (!this.workletModuleLoaded) {
+                await this.audioCtx.audioWorklet.addModule(this.workletPath);
+                this.workletModuleLoaded = true;
+            }
+
+            // Instantiate dedicated pitch processor worklet
+            this.workletNode = new AudioWorkletNode(this.audioCtx, 'pitch-processor', {
+                processorOptions: {
+                    bufferSize: this.bufferSize,
+                    sampleRate: this.sampleRate,
+                    minFreq: this.minFreq,
+                    maxFreq: this.maxFreq,
+                    noiseGate: this.noiseGateRMS,
+                    hopSize: Math.round(this.sampleRate / 60)
+                }
+            });
+
+            // Listen to 60 Hz pitch & analysis messages posted from the worklet thread
+            this.workletNode.port.onmessage = (event) => {
+                if (event && event.data) {
+                    this.handleWorkletMessage(event.data);
+                }
+            };
+
+            this.workletNode.onprocessorerror = (err) => {
+                console.warn("AudioWorkletProcessor error encountered, engaging main-thread fallback:", err);
+                this.useWorklet = false;
+                this.initFallbackNode();
+            };
+
+            // Connect input source to worklet node
+            this.sourceNode.connect(this.workletNode);
+
+            // Connect worklet node through a silent gain node to destination to ensure
+            // the Web Audio graph scheduler keeps the worklet active across all browsers
+            this.workletGain = this.audioCtx.createGain();
+            this.workletGain.gain.value = 0;
+            this.workletNode.connect(this.workletGain);
+            this.workletGain.connect(this.audioCtx.destination);
+
+            this.useWorklet = true;
+        } catch (err) {
+            console.warn("AudioWorklet initialization failed or blocked by origin policies, gracefully falling back to ScriptProcessor/AnalyserNode:", err);
+            this.useWorklet = false;
+            if (this.workletNode) {
+                try { this.workletNode.disconnect(); } catch (e) {}
+                this.workletNode = null;
+            }
+            this.initFallbackNode();
+        }
+    }
+
+    /**
+     * Gracefully configures fallback to ScriptProcessor or AnalyserNode.
+     */
+    initFallbackNode() {
+        this.useWorklet = false;
+        if (this.useScriptProcessor && this.audioCtx && typeof this.audioCtx.createScriptProcessor === 'function') {
+            try {
+                this.scriptNode = this.audioCtx.createScriptProcessor(this.bufferSize, 1, 1);
+                this.scriptNode.onaudioprocess = (e) => {
+                    if (!this.isRunning) return;
+                    const input = e.inputBuffer.getChannelData(0);
+                    this.analyzeFrame(input, this.audioCtx.currentTime);
+                };
+                this.sourceNode.connect(this.scriptNode);
+                this.scriptNode.connect(this.audioCtx.destination);
+            } catch (err) {
+                console.warn("ScriptProcessor fallback creation failed, relying on AnalyserNode loop:", err);
+                this.scriptNode = null;
+            }
+        }
+    }
+
+    /**
+     * Seamlessly pipes worklet message payload to existing pitch listeners and callbacks
+     * without altering the external API contract.
+     * @param {Object} data - Message payload from AudioWorkletProcessor
+     */
+    handleWorkletMessage(data) {
+        if (!this.isRunning || !data) return;
+
+        const currentTime = (data.time !== undefined) ? data.time : (this.audioCtx ? this.audioCtx.currentTime : 0);
+        const rms = data.rms || 0;
+        const peakSample = (data.peakSample !== undefined) ? data.peakSample : Math.min(1, rms * 1.414);
+        const rmsDb = rms > 0.0001 ? 20 * Math.log10(rms / 0.707) : -96;
+        const isClipping = peakSample >= 0.96 || rms > 0.45;
+
+        // 1. Dispatch Audio Metrics to UI
+        if (this.onAudioMetrics) {
+            this.onAudioMetrics({
+                rms,
+                peakSample,
+                rmsDb,
+                isClipping
+            });
+        }
+
+        // 2. Check noise gate / silence
+        if (rms < this.noiseGateRMS || data.isSilence) {
+            this.prevRMS = rms;
+            this.pitchHistory = [];
+            if (this.lastDetectedMidi !== -1) {
+                if (this.onNoteOff) {
+                    this.onNoteOff({ time: currentTime, midi: this.lastDetectedMidi });
+                }
+                this.lastDetectedMidi = -1;
+            }
+            if (this.onSilence) this.onSilence();
+            return;
+        }
+
+        // 3. Detect Transient Pluck Onset
+        const rmsDelta = rms - this.prevRMS;
+        const isTransient = (rmsDelta > this.onsetThreshold) && ((currentTime - this.lastNoteTime) > this.pluckCooldown);
+        this.prevRMS = rms;
+
+        // 4. Fundamental Frequency ($f_0$) & Note Processing
+        const freq = (data.f0 !== undefined) ? data.f0 : (data.frequency || 0);
+        const confidence = (data.confidence !== undefined) ? data.confidence : 0;
+
+        if (freq >= this.minFreq && freq <= this.maxFreq && confidence >= this.pitchConfidenceThreshold) {
+            const midiExact = 69 + 12 * Math.log2(freq / this.a4);
+            const midi = Math.round(midiExact);
+            const cents = Math.round((midiExact - midi) * 100);
+            const noteName = this.midiToNoteName(midi);
+            const octave = Math.floor(midi / 12) - 1;
+
+            // Median smoothing over recent frames to stabilize
+            this.pitchHistory.push(midi);
+            if (this.pitchHistory.length > this.historySize) {
+                this.pitchHistory.shift();
+            }
+            const stableMidi = this.getMedian(this.pitchHistory);
+
+            const notePayload = {
+                frequency: freq,
+                midi: stableMidi,
+                midiExact: midiExact,
+                noteName: noteName,
+                octave: octave,
+                cents: cents,
+                confidence: confidence,
+                rms: rms,
+                time: currentTime,
+                isPluck: isTransient || (stableMidi !== this.lastDetectedMidi)
+            };
+
+            if (this.onPitchDetected) {
+                this.onPitchDetected(notePayload);
+            }
+
+            if (notePayload.isPluck) {
+                this.lastNoteTime = currentTime;
+                this.lastDetectedMidi = stableMidi;
+                if (this.onPluck) {
+                    this.onPluck(notePayload);
+                }
+            }
         }
     }
 
@@ -142,10 +339,30 @@ class GuitarDSP {
     }
 
     /**
-     * Stops microphone capture.
+     * Stops microphone capture, audio processing, and disconnects all nodes.
      */
     stopMicrophone() {
         this.isRunning = false;
+        if (this.workletNode) {
+            try {
+                this.workletNode.port.onmessage = null;
+                this.workletNode.disconnect();
+            } catch (e) {}
+            this.workletNode = null;
+        }
+        if (this.workletGain) {
+            try {
+                this.workletGain.disconnect();
+            } catch (e) {}
+            this.workletGain = null;
+        }
+        if (this.scriptNode) {
+            try {
+                this.scriptNode.disconnect();
+                this.scriptNode.onaudioprocess = null;
+            } catch (e) {}
+            this.scriptNode = null;
+        }
         if (this.effectsRack) {
             this.effectsRack.setSourceNode(null);
         }
@@ -157,17 +374,27 @@ class GuitarDSP {
             this.sourceNode.disconnect();
             this.sourceNode = null;
         }
+        this.useWorklet = false;
     }
 
     /**
-     * Continuous audio processing loop using requestAnimationFrame for zero audio-thread stutter.
+     * Audio visualization loop using requestAnimationFrame.
+     * When AudioWorklet is engaged, heavy pitch detection is offloaded to the
+     * audio thread, freeing the main UI thread from any CPU spikes or audio glitches.
      */
     processAudioLoop() {
         if (!this.isRunning) return;
 
         if (this.analyser) {
-            this.analyser.getFloatTimeDomainData(this.timeDomainBuffer);
-            this.analyzeFrame(this.timeDomainBuffer, this.audioCtx.currentTime);
+            // Read time-domain buffer if waveform visualizer is subscribed or in fallback mode
+            if (this.onWaveformData || (!this.useWorklet && !this.scriptNode)) {
+                this.analyser.getFloatTimeDomainData(this.timeDomainBuffer);
+            }
+
+            // Only run main-thread pitch analysis in fallback mode (when worklet is not active)
+            if (!this.useWorklet && !this.scriptNode) {
+                this.analyzeFrame(this.timeDomainBuffer, this.audioCtx ? this.audioCtx.currentTime : 0);
+            }
 
             if (this.onWaveformData) {
                 this.onWaveformData(this.timeDomainBuffer);
@@ -182,13 +409,16 @@ class GuitarDSP {
             }
         }
 
-        requestAnimationFrame(() => this.processAudioLoop());
+        if (typeof requestAnimationFrame !== 'undefined') {
+            requestAnimationFrame(() => this.processAudioLoop());
+        }
     }
 
     /**
      * Analyzes a single frame of raw audio samples for pitch, RMS, and onset pluck.
+     * Used in fallback mode when AudioWorklet is unavailable or for unit tests.
      */
-    analyzeFrame(buffer, currentTime) {
+    analyzeFrame(buffer, currentTime = 0) {
         // 1. Calculate RMS Energy and Peak Sample
         let sumSq = 0;
         let peakSample = 0;
@@ -456,4 +686,5 @@ class GuitarDSP {
 
 if (typeof module !== 'undefined') {
     module.exports = GuitarDSP;
+    module.exports.GuitarDSP = GuitarDSP;
 }

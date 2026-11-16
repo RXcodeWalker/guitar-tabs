@@ -136,6 +136,159 @@ const DEMO_SONGS = {
             { string: 2, fret: 0, finger: 0, noteName: "B3", time: 3.72, duration: 0.30 },
             { string: 3, fret: 0, finger: 0, noteName: "G3", time: 4.03, duration: 0.30 }
         ]
+    },
+
+    majorScaleArpeggio: {
+        title: "C Major Scale Arpeggio (Multi-Bar Technical Drill)",
+        bpm: 120,
+        timeSignature: "4/4",
+        category: "exercise",
+        notes: [
+            // Bar 1 (0.00s - 2.00s): Ascending C Major Arpeggio across strings 5 to 1
+            { string: 5, fret: 3, finger: 3, noteName: "C3", midi: 48, time: 0.00, duration: 0.25 },
+            { string: 4, fret: 2, finger: 2, noteName: "E3", midi: 52, time: 0.25, duration: 0.25 },
+            { string: 3, fret: 0, finger: 0, noteName: "G3", midi: 55, time: 0.50, duration: 0.25 },
+            { string: 2, fret: 1, finger: 1, noteName: "C4", midi: 60, time: 0.75, duration: 0.25 },
+            { string: 1, fret: 0, finger: 0, noteName: "E4", midi: 64, time: 1.00, duration: 0.25 },
+            { string: 1, fret: 3, finger: 3, noteName: "G4", midi: 67, time: 1.25, duration: 0.25 },
+            { string: 1, fret: 8, finger: 4, noteName: "C5", midi: 72, time: 1.50, duration: 0.50 },
+
+            // Bar 2 (2.00s - 4.00s): Descending C Major Arpeggio
+            { string: 1, fret: 3, finger: 3, noteName: "G4", midi: 67, time: 2.00, duration: 0.25 },
+            { string: 1, fret: 0, finger: 0, noteName: "E4", midi: 64, time: 2.25, duration: 0.25 },
+            { string: 2, fret: 1, finger: 1, noteName: "C4", midi: 60, time: 2.50, duration: 0.25 },
+            { string: 3, fret: 0, finger: 0, noteName: "G3", midi: 55, time: 2.75, duration: 0.25 },
+            { string: 4, fret: 2, finger: 2, noteName: "E3", midi: 52, time: 3.00, duration: 0.25 },
+            { string: 5, fret: 3, finger: 3, noteName: "C3", midi: 48, time: 3.25, duration: 0.75 },
+
+            // Bar 3 (4.00s - 6.00s): Octave Rolling Arpeggio Turn
+            { string: 4, fret: 2, finger: 2, noteName: "E3", midi: 52, time: 4.00, duration: 0.25 },
+            { string: 3, fret: 0, finger: 0, noteName: "G3", midi: 55, time: 4.25, duration: 0.25 },
+            { string: 2, fret: 1, finger: 1, noteName: "C4", midi: 60, time: 4.50, duration: 0.25 },
+            { string: 1, fret: 0, finger: 0, noteName: "E4", midi: 64, time: 4.75, duration: 0.25 },
+            { string: 2, fret: 1, finger: 1, noteName: "C4", midi: 60, time: 5.00, duration: 0.25 },
+            { string: 3, fret: 0, finger: 0, noteName: "G3", midi: 55, time: 5.25, duration: 0.25 },
+            { string: 5, fret: 3, finger: 3, noteName: "C3", midi: 48, time: 5.50, duration: 0.50 }
+        ]
+    },
+
+    pentatonicSpeedDrill: {
+        title: "E Minor Pentatonic Speed Run (Alternate Picking Drill)",
+        bpm: 120,
+        timeSignature: "4/4",
+        category: "exercise",
+        notes: [
+            // Bar 1 (0.00s - 2.00s): Ascending 16th-note sequence through open position
+            { string: 6, fret: 0, finger: 0, noteName: "E2", midi: 40, time: 0.00, duration: 0.25 },
+            { string: 6, fret: 3, finger: 3, noteName: "G2", midi: 43, time: 0.25, duration: 0.25 },
+            { string: 5, fret: 0, finger: 0, noteName: "A2", midi: 45, time: 0.50, duration: 0.25 },
+            { string: 5, fret: 2, finger: 2, noteName: "B2", midi: 47, time: 0.75, duration: 0.25 },
+            { string: 4, fret: 0, finger: 0, noteName: "D3", midi: 50, time: 1.00, duration: 0.25 },
+            { string: 4, fret: 2, finger: 2, noteName: "E3", midi: 52, time: 1.25, duration: 0.25 },
+            { string: 3, fret: 0, finger: 0, noteName: "G3", midi: 55, time: 1.50, duration: 0.25 },
+            { string: 3, fret: 2, finger: 2, noteName: "A3", midi: 57, time: 1.75, duration: 0.25 },
+
+            // Bar 2 (2.00s - 4.00s): Climbing to high E and peak turnaround
+            { string: 2, fret: 0, finger: 0, noteName: "B3", midi: 59, time: 2.00, duration: 0.25 },
+            { string: 2, fret: 3, finger: 3, noteName: "D4", midi: 62, time: 2.25, duration: 0.25 },
+            { string: 1, fret: 0, finger: 0, noteName: "E4", midi: 64, time: 2.50, duration: 0.25 },
+            { string: 1, fret: 3, finger: 3, noteName: "G4", midi: 67, time: 2.75, duration: 0.25 },
+            { string: 1, fret: 0, finger: 0, noteName: "E4", midi: 64, time: 3.00, duration: 0.25 },
+            { string: 2, fret: 3, finger: 3, noteName: "D4", midi: 62, time: 3.25, duration: 0.25 },
+            { string: 2, fret: 0, finger: 0, noteName: "B3", midi: 59, time: 3.50, duration: 0.25 },
+            { string: 3, fret: 2, finger: 2, noteName: "A3", midi: 57, time: 3.75, duration: 0.25 },
+
+            // Bar 3 (4.00s - 6.00s): Descending cascade resolving on low tonic
+            { string: 3, fret: 0, finger: 0, noteName: "G3", midi: 55, time: 4.00, duration: 0.25 },
+            { string: 4, fret: 2, finger: 2, noteName: "E3", midi: 52, time: 4.25, duration: 0.25 },
+            { string: 4, fret: 0, finger: 0, noteName: "D3", midi: 50, time: 4.50, duration: 0.25 },
+            { string: 5, fret: 2, finger: 2, noteName: "B2", midi: 47, time: 4.75, duration: 0.25 },
+            { string: 5, fret: 0, finger: 0, noteName: "A2", midi: 45, time: 5.00, duration: 0.25 },
+            { string: 6, fret: 3, finger: 3, noteName: "G2", midi: 43, time: 5.25, duration: 0.25 },
+            { string: 6, fret: 0, finger: 0, noteName: "E2", midi: 40, time: 5.50, duration: 0.50 }
+        ]
+    },
+
+    chordStrummingSequence: {
+        title: "Open Chords Strumming Sequence (G - Em - C - D)",
+        bpm: 100,
+        timeSignature: "4/4",
+        category: "exercise",
+        notes: [
+            // Bar 1 (0.00s - 2.40s): G Major Strumming
+            { string: 6, fret: 3, finger: 2, noteName: "G2", midi: 43, time: 0.00, duration: 0.50 },
+            { string: 5, fret: 2, finger: 1, noteName: "B2", midi: 47, time: 0.00, duration: 0.50 },
+            { string: 4, fret: 0, finger: 0, noteName: "D3", midi: 50, time: 0.00, duration: 0.50 },
+            { string: 3, fret: 0, finger: 0, noteName: "G3", midi: 55, time: 0.00, duration: 0.50 },
+            { string: 2, fret: 3, finger: 3, noteName: "D4", midi: 62, time: 0.00, duration: 0.50 },
+            { string: 1, fret: 3, finger: 4, noteName: "G4", midi: 67, time: 0.00, duration: 0.50 },
+
+            { string: 4, fret: 0, finger: 0, noteName: "D3", midi: 50, time: 0.60, duration: 0.50 },
+            { string: 3, fret: 0, finger: 0, noteName: "G3", midi: 55, time: 0.60, duration: 0.50 },
+            { string: 2, fret: 3, finger: 3, noteName: "D4", midi: 62, time: 0.60, duration: 0.50 },
+            { string: 1, fret: 3, finger: 4, noteName: "G4", midi: 67, time: 0.60, duration: 0.50 },
+
+            { string: 6, fret: 3, finger: 2, noteName: "G2", midi: 43, time: 1.20, duration: 0.50 },
+            { string: 5, fret: 2, finger: 1, noteName: "B2", midi: 47, time: 1.20, duration: 0.50 },
+            { string: 4, fret: 0, finger: 0, noteName: "D3", midi: 50, time: 1.20, duration: 0.50 },
+
+            { string: 3, fret: 0, finger: 0, noteName: "G3", midi: 55, time: 1.80, duration: 0.50 },
+            { string: 2, fret: 3, finger: 3, noteName: "D4", midi: 62, time: 1.80, duration: 0.50 },
+            { string: 1, fret: 3, finger: 4, noteName: "G4", midi: 67, time: 1.80, duration: 0.50 },
+
+            // Bar 2 (2.40s - 4.80s): E Minor Strumming
+            { string: 6, fret: 0, finger: 0, noteName: "E2", midi: 40, time: 2.40, duration: 0.50 },
+            { string: 5, fret: 2, finger: 2, noteName: "B2", midi: 47, time: 2.40, duration: 0.50 },
+            { string: 4, fret: 2, finger: 3, noteName: "E3", midi: 52, time: 2.40, duration: 0.50 },
+            { string: 3, fret: 0, finger: 0, noteName: "G3", midi: 55, time: 2.40, duration: 0.50 },
+            { string: 2, fret: 0, finger: 0, noteName: "B3", midi: 59, time: 2.40, duration: 0.50 },
+            { string: 1, fret: 0, finger: 0, noteName: "E4", midi: 64, time: 2.40, duration: 0.50 },
+
+            { string: 4, fret: 2, finger: 3, noteName: "E3", midi: 52, time: 3.00, duration: 0.50 },
+            { string: 3, fret: 0, finger: 0, noteName: "G3", midi: 55, time: 3.00, duration: 0.50 },
+            { string: 2, fret: 0, finger: 0, noteName: "B3", midi: 59, time: 3.00, duration: 0.50 },
+            { string: 1, fret: 0, finger: 0, noteName: "E4", midi: 64, time: 3.00, duration: 0.50 },
+
+            { string: 6, fret: 0, finger: 0, noteName: "E2", midi: 40, time: 3.60, duration: 0.50 },
+            { string: 5, fret: 2, finger: 2, noteName: "B2", midi: 47, time: 3.60, duration: 0.50 },
+
+            { string: 3, fret: 0, finger: 0, noteName: "G3", midi: 55, time: 4.20, duration: 0.50 },
+            { string: 2, fret: 0, finger: 0, noteName: "B3", midi: 59, time: 4.20, duration: 0.50 },
+            { string: 1, fret: 0, finger: 0, noteName: "E4", midi: 64, time: 4.20, duration: 0.50 },
+
+            // Bar 3 (4.80s - 7.20s): C Major Strumming
+            { string: 5, fret: 3, finger: 3, noteName: "C3", midi: 48, time: 4.80, duration: 0.50 },
+            { string: 4, fret: 2, finger: 2, noteName: "E3", midi: 52, time: 4.80, duration: 0.50 },
+            { string: 3, fret: 0, finger: 0, noteName: "G3", midi: 55, time: 4.80, duration: 0.50 },
+            { string: 2, fret: 1, finger: 1, noteName: "C4", midi: 60, time: 4.80, duration: 0.50 },
+            { string: 1, fret: 0, finger: 0, noteName: "E4", midi: 64, time: 4.80, duration: 0.50 },
+
+            { string: 3, fret: 0, finger: 0, noteName: "G3", midi: 55, time: 5.40, duration: 0.50 },
+            { string: 2, fret: 1, finger: 1, noteName: "C4", midi: 60, time: 5.40, duration: 0.50 },
+            { string: 1, fret: 0, finger: 0, noteName: "E4", midi: 64, time: 5.40, duration: 0.50 },
+
+            { string: 5, fret: 3, finger: 3, noteName: "C3", midi: 48, time: 6.00, duration: 0.50 },
+            { string: 4, fret: 2, finger: 2, noteName: "E3", midi: 52, time: 6.00, duration: 0.50 },
+
+            { string: 2, fret: 1, finger: 1, noteName: "C4", midi: 60, time: 6.60, duration: 0.50 },
+            { string: 1, fret: 0, finger: 0, noteName: "E4", midi: 64, time: 6.60, duration: 0.50 },
+
+            // Bar 4 (7.20s - 9.60s): D Major Strumming
+            { string: 4, fret: 0, finger: 0, noteName: "D3", midi: 50, time: 7.20, duration: 0.50 },
+            { string: 3, fret: 2, finger: 1, noteName: "A3", midi: 57, time: 7.20, duration: 0.50 },
+            { string: 2, fret: 3, finger: 3, noteName: "D4", midi: 62, time: 7.20, duration: 0.50 },
+            { string: 1, fret: 2, finger: 2, noteName: "F#4", midi: 66, time: 7.20, duration: 0.50 },
+
+            { string: 3, fret: 2, finger: 1, noteName: "A3", midi: 57, time: 7.80, duration: 0.50 },
+            { string: 2, fret: 3, finger: 3, noteName: "D4", midi: 62, time: 7.80, duration: 0.50 },
+            { string: 1, fret: 2, finger: 2, noteName: "F#4", midi: 66, time: 7.80, duration: 0.50 },
+
+            { string: 4, fret: 0, finger: 0, noteName: "D3", midi: 50, time: 8.40, duration: 0.50 },
+            { string: 3, fret: 2, finger: 1, noteName: "A3", midi: 57, time: 8.40, duration: 0.50 },
+
+            { string: 2, fret: 3, finger: 3, noteName: "D4", midi: 62, time: 9.00, duration: 0.50 },
+            { string: 1, fret: 2, finger: 2, noteName: "F#4", midi: 66, time: 9.00, duration: 0.50 }
+        ]
     }
 };
 

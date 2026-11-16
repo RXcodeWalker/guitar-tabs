@@ -299,10 +299,16 @@ class TablaturePlaybackController {
         // Sort notes chronologically
         this.tablature.notes.sort((a, b) => a.time - b.time);
 
-        if (fromStart || this.playbackTime >= this.getSongEndTime()) {
-            this.playbackTime = 0;
+        const isPractice = this.tablature && this.tablature.isPracticeLoopEnabled && this.tablature.isPracticeLoopEnabled();
+        const loopStart = (isPractice && typeof this.tablature.loopStartTime === 'number') ? this.tablature.loopStartTime : 0;
+
+        if (fromStart || this.playbackTime >= this.getSongEndTime() || (isPractice && this.playbackTime >= this.tablature.loopEndTime)) {
+            this.playbackTime = loopStart;
             this.scheduledNoteIndices.clear();
-            this.tablature.currentTime = 0;
+            this.tablature.currentTime = loopStart;
+            if (this.tablature.syncAudioClock) {
+                this.tablature.syncAudioClock(loopStart);
+            }
         }
 
         this.isPlaying = true;
@@ -407,13 +413,22 @@ class TablaturePlaybackController {
             }
         }
 
-        // Check if playback reached the end of the score
-        const songEndTime = this.getSongEndTime();
-        if (this.playbackTime >= songEndTime) {
-            if (this.isLooping && notes.length > 0) {
-                this.playbackTime = 0;
+        // Check if playback reached the end of the score or loop region
+        const isPractice = this.tablature && this.tablature.isPracticeLoopEnabled && this.tablature.isPracticeLoopEnabled();
+        const loopEnd = (isPractice && this.tablature.loopEndTime > 0) ? this.tablature.loopEndTime : this.getSongEndTime();
+        const loopStart = isPractice ? this.tablature.loopStartTime : 0;
+
+        if (this.playbackTime >= loopEnd) {
+            if ((this.isLooping || isPractice) && notes.length > 0) {
+                if (this.tablature && this.tablature.handleLoopCompletion) {
+                    this.tablature.handleLoopCompletion();
+                }
+                this.playbackTime = loopStart;
                 this.scheduledNoteIndices.clear();
-                this.tablature.currentTime = 0;
+                this.tablature.currentTime = loopStart;
+                if (this.tablature.syncAudioClock) {
+                    this.tablature.syncAudioClock(loopStart);
+                }
             } else {
                 this.stopPlayback();
                 return;
