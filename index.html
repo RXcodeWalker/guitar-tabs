@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Guitar Fretboard & Auto-Scrolling Tablature Visualizer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- 1. Header & Live Audio Tuner HUD -->
+        <header class="app-header">
+            <div class="brand-section">
+                <span class="brand-icon">🎸</span>
+                <div>
+                    <h1 class="brand-title">GuitarVision Studio</h1>
+                    <div class="brand-subtitle">Real-Time DSP Pitch • Ergonomic Fretboard • Auto-Scrolling Tab</div>
+                </div>
+            </div>
+
+            <!-- Pitch, Tuner & Hand Position HUD -->
+            <div class="tuner-hud">
+                <div class="note-display">
+                    <div id="noteBadge" class="note-badge">--</div>
+                    <div id="freqDisplay" class="freq-display">0.0 Hz</div>
+                </div>
+
+                <div class="tuner-meter">
+                    <div class="meter-track">
+                        <div class="meter-center-tick"></div>
+                        <div id="tunerNeedle" class="tuner-needle"></div>
+                    </div>
+                    <div id="centsDisplay" class="cents-display">0¢</div>
+                </div>
+
+                <!-- Ergonomic Hand Position Anchor -->
+                <div id="handPosBadge" class="hand-position-badge" title="Ergonomic Hand Position Anchor">Pos: Fret 1</div>
+
+                <!-- Live Audio VU Meter -->
+                <div class="vu-meter-container" title="Audio Input Level">
+                    <div class="vu-label">Level</div>
+                    <div class="vu-track">
+                        <div id="vuMeterBar" class="vu-bar"></div>
+                    </div>
+                </div>
+
+                <!-- Metronome Pulse LED & Counter -->
+                <div class="metronome-hud" title="4/4 Metronome Beat">
+                    <div id="metronomePulse" class="metronome-pulse"></div>
+                    <div id="metronomeBeatDisplay" class="metronome-beat-display">M1 : Beat 1</div>
+                </div>
+            </div>
+
+            <div class="header-actions">
+                <span id="micStatusIndicator" class="status-badge status-idle">Mic Off</span>
+                <button id="btnMicToggle" class="btn btn-primary">
+                    <span class="icon">🎤</span> Enable Microphone
+                </button>
+            </div>
+        </header>
+
+        <!-- 2. Fretboard Visualizer (22 Frets with Gauge-varying strings & Inlays) -->
+        <section class="visualizer-card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span>Fretboard Visualizer</span>
+                    <span class="tag">22 Frets • 6 Strings • Neon Indicators</span>
+                </div>
+                <div class="guide-item">
+                    <span style="font-size: 11px; color: var(--text-muted);">💡 Click or tap any fret/string to pluck</span>
+                </div>
+            </div>
+            <div class="canvas-viewport">
+                <canvas id="fretboardCanvas"></canvas>
+            </div>
+        </section>
+
+        <!-- 3. Auto-Scrolling Tablature Staff (6 Strings, Measure Bars, Playhead) -->
+        <section class="visualizer-card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span>Auto-Scrolling Tablature Staff</span>
+                    <span class="tag">4/4 Metronome • 60 FPS • Real-time Recording</span>
+                </div>
+                <div style="font-size: 11px; color: var(--text-secondary); display: flex; gap: 12px; align-items: center;">
+                    <span>Time: <strong>4/4</strong></span>
+                    <span style="color: var(--neon-cyan);">▶ Live Playhead</span>
+                </div>
+            </div>
+            <div class="canvas-viewport">
+                <canvas id="tablatureCanvas"></canvas>
+            </div>
+        </section>
+
+        <!-- 4. Control Toolbar & Parameters Dock -->
+        <section class="control-dock">
+            <!-- Playback & Scroll -->
+            <div class="control-group">
+                <button id="btnPlayPause" class="btn">
+                    <span class="icon">⏸</span> Pause
+                </button>
+                <button id="btnRewind" class="btn">
+                    <span class="icon">⏮</span> Rewind
+                </button>
+                <button id="btnClearTab" class="btn">
+                    <span class="icon">🗑</span> Clear Tab
+                </button>
+            </div>
+
+            <!-- Tempo & Metronome -->
+            <div class="control-group">
+                <span class="group-label">Tempo</span>
+                <button id="btnBpmMinus" class="btn btn-icon-only">-</button>
+                <div class="slider-container">
+                    <input type="range" id="bpmSlider" min="40" max="240" value="120" step="1">
+                    <span id="bpmDisplay" class="val-badge">120 BPM</span>
+                </div>
+                <button id="btnBpmPlus" class="btn btn-icon-only">+</button>
+                <button id="btnTapTempo" class="btn">Tap</button>
+                <button id="btnMetronomeSound" class="btn active" title="Toggle Metronome Audio Click">
+                    <span class="icon">🔔</span> Click ON
+                </button>
+            </div>
+
+            <!-- Tab Zoom -->
+            <div class="control-group">
+                <span class="group-label">Zoom</span>
+                <input type="range" id="zoomSlider" min="60" max="200" value="105" step="5">
+            </div>
+
+            <!-- Tuning & Ergonomics -->
+            <div class="control-group">
+                <span class="group-label">Tuning</span>
+                <select id="selectTuning" class="select-input">
+                    <option value="standard">Standard (E A D G B e)</option>
+                    <option value="dropD">Drop D (D A D G B e)</option>
+                    <option value="halfStep">Half-Step Down (Eb Ab Db Gb Bb eb)</option>
+                    <option value="dadgad">DADGAD (D A D G A d)</option>
+                </select>
+
+                <span class="group-label">Ergonomics</span>
+                <select id="selectErgoMode" class="select-input">
+                    <option value="adaptive">Adaptive Hand Position</option>
+                    <option value="open">Open Position (Frets 0-4)</option>
+                    <option value="mid">Mid-Neck Box (Frets 5-9)</option>
+                    <option value="high">Lead Register (Frets 10-22)</option>
+                </select>
+            </div>
+
+            <!-- Noise Gate -->
+            <div class="control-group">
+                <span class="group-label" title="Minimum signal level to trigger note plucks">Noise Gate</span>
+                <input type="range" id="noiseGateSlider" min="0.002" max="0.050" value="0.008" step="0.002">
+                <span id="noiseGateVal" class="val-badge" style="min-width: 45px;">0.008</span>
+            </div>
+
+            <!-- Demo Riffs & Export -->
+            <div class="control-group">
+                <span class="group-label">Demo Riffs</span>
+                <select id="selectDemoSong" class="select-input">
+                    <option value="sweetChild">Sweet Child O' Mine (Slash)</option>
+                    <option value="smokeOnWater">Smoke On The Water (Deep Purple)</option>
+                    <option value="pentatonicRun">A Minor Pentatonic Box (Frets 5-8)</option>
+                    <option value="nothingElseMatters">Nothing Else Matters (Metallica)</option>
+                </select>
+                <button id="btnPlayDemo" class="btn btn-primary">
+                    <span class="icon">▶</span> Play Demo Riff
+                </button>
+                <button id="btnExportASCII" class="btn">
+                    <span class="icon">📄</span> Export Tab
+                </button>
+            </div>
+        </section>
+
+        <!-- 5. Keyboard Shortcut Guide & Tips -->
+        <footer class="keyboard-guide-card">
+            <div class="guide-items">
+                <div class="guide-item">
+                    <span class="group-label">Virtual Plucks:</span>
+                    <kbd>1</kbd>–<kbd>6</kbd> <span>Open Strings (e to E)</span>
+                </div>
+                <div class="guide-item">
+                    <kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><kbd>F</kbd><kbd>G</kbd><kbd>H</kbd><kbd>J</kbd><kbd>K</kbd>
+                    <span>Pentatonic Scale Run</span>
+                </div>
+                <div class="guide-item">
+                    <kbd>Space</kbd> <span>Play/Pause</span>
+                </div>
+                <div class="guide-item">
+                    <kbd>R</kbd> <span>Rewind</span>
+                </div>
+            </div>
+            <div>
+                <span>Phase 1 (DSP) + Phase 2 (Optimization) + Phase 3 (Canvas Visualizer) Fully Integrated</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- 6. ASCII Tablature Export Modal -->
+    <div id="asciiModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Exported Guitar Tablature (ASCII)</h3>
+                <button id="btnCloseModal" class="btn btn-icon-only">✕</button>
+            </div>
+            <textarea id="asciiContent" class="modal-textarea" readonly></textarea>
+            <div class="modal-footer">
+                <button id="btnCopyAscii" class="btn btn-primary">Copy to Clipboard</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Scripts -->
+    <script src="js/dsp.js"></script>
+    <script src="js/optimizer.js"></script>
+    <script src="js/fretboard.js"></script>
+    <script src="js/tablature.js"></script>
+    <script src="js/demo-songs.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
