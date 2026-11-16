@@ -394,6 +394,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function updatePitchUI(data) {
+        // Read-only consumption of live pitch for real-time note accuracy grading
+        if (tablature && tablature.scoreLivePitch && data) {
+            tablature.scoreLivePitch(data);
+        }
+
         if (noteBadge) {
             noteBadge.textContent = data.noteName + data.octave;
             noteBadge.classList.add('note-active');
