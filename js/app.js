@@ -1,37 +1,99 @@
 /**
  * Main Application Orchestrator
  * Integrates Audio DSP (Phase 1), Fretboard Optimizer (Phase 2),
- * Fretboard Canvas Visualizer, and Auto-Scrolling Tablature Staff.
+ * Fretboard Canvas Visualizer, Auto-Scrolling Tablature Staff,
+ * Rhythm Quantizer, Karplus-Strong / Polyphonic Synthesizer Playback,
+ * and Multi-Format Exporter (ASCII, MusicXML, JSON, MIDI).
  */
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Initialize Optimizer
+    // 1. Initialize Optimizer (Phase 2)
     const optimizer = new GuitarOptimizer({
         tuning: 'standard',
         mode: 'adaptive'
     });
 
-    // 2. Initialize Audio DSP Engine
+    // 2. Initialize Rhythm Quantizer
+    const quantizer = new GuitarQuantizer({
+        bpm: 120,
+        grid: '16th',
+        liveQuantize: false
+    });
+
+    // 3. Initialize Audio DSP Engine (Phase 1)
     const dsp = new GuitarDSP({
         a4: 440,
         onPitchDetected: (data) => updatePitchUI(data),
         onPluck: (data) => handleDetectedPluck(data),
+        onNoteOff: (data) => handleDetectedNoteOff(data),
         onSilence: () => handleSilenceUI(),
         onWaveformData: (buffer) => renderVUMeter(buffer)
     });
 
-    // 3. Initialize Fretboard Visualizer
+    // 4. Initialize Playback Synthesizer Engine (Karplus-Strong & PolySynth)
+    const synth = new GuitarSynth({
+        soundEngine: 'karplus',
+        volume: 0.85
+    });
+
+    // 5. Initialize Multi-Format Exporter
+    const exporter = new GuitarExporter({
+        title: 'GuitarVision Studio Transcription',
+        bpm: 120,
+        tuning: {
+            name: 'Standard',
+            strings: [64, 59, 55, 50, 45, 40],
+            names: ["e", "B", "G", "D", "A", "E"]
+        }
+    });
+
+    // 6. Initialize Fretboard Visualizer
     const fretboard = new FretboardVisualizer('fretboardCanvas', {
         numFrets: 22,
         onFretClick: (string, fret) => handleFretboardClick(string, fret)
     });
 
-    // 4. Initialize Auto-Scrolling Tablature Staff
+    // 7. Initialize Auto-Scrolling Tablature Staff
     const tablature = new TablatureStaff('tablatureCanvas', {
         bpm: 120,
         pixelsPerBeat: 105,
         playheadRatio: 0.35,
+        quantizer: quantizer,
         onMetronomeClick: (data) => handleMetronomeTick(data)
+    });
+
+    // 8. Initialize Tablature Playback Controller (Animated Playhead + Synth Engine)
+    const playbackController = new TablaturePlaybackController({
+        tablature: tablature,
+        fretboard: fretboard,
+        synth: synth,
+        optimizer: optimizer,
+        onPlaybackStateChange: ({ isPlaying }) => {
+            if (btnPlayBack) {
+                if (isPlaying) {
+                    btnPlayBack.innerHTML = '<span class="icon">⏹</span> Stop Playback';
+                    btnPlayBack.classList.add('btn-playing');
+                } else {
+                    btnPlayBack.innerHTML = '<span class="icon">▶️</span> Play Back';
+                    btnPlayBack.classList.remove('btn-playing');
+                }
+            }
+        },
+        onNoteTrigger: (note, midi) => {
+            const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+            const name = noteNames[midi % 12];
+            const oct = Math.floor(midi / 12) - 1;
+            updatePitchUI({
+                noteName: name,
+                octave: oct,
+                frequency: synth.midiToFrequency(midi),
+                cents: 0
+            });
+            if (handPosBadge) {
+                optimizer.updateHandPosition(note.fret);
+                handPosBadge.textContent = `Pos: Fret ${optimizer.handAnchorFret}`;
+            }
+        }
     });
 
     // State
@@ -41,7 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let demoPlaybackTimer = null;
     let isDemoPlaying = false;
 
-    // DOM Elements
+    // DOM Elements - Tuner HUD
     const btnMicToggle = document.getElementById('btnMicToggle');
     const micStatusIndicator = document.getElementById('micStatusIndicator');
     const noteBadge = document.getElementById('noteBadge');
@@ -53,34 +115,68 @@ document.addEventListener('DOMContentLoaded', () => {
     const metronomePulse = document.getElementById('metronomePulse');
     const metronomeBeatDisplay = document.getElementById('metronomeBeatDisplay');
 
-    // Controls DOM
+    // Controls DOM - Playback & Synth
+    const btnPlayBack = document.getElementById('btnPlayBack');
+    const btnPlayPause = document.getElementById('btnPlayPause');
+    const btnRewind = document.getElementById('btnRewind');
+    const btnClearTab = document.getElementById('btnClearTab');
+    const selectSynthSound = document.getElementById('selectSynthSound');
+
+    // Controls DOM - Rhythm & Quantization
+    const selectQuantizeGrid = document.getElementById('selectQuantizeGrid');
+    const btnQuantizeNow = document.getElementById('btnQuantizeNow');
+    const btnLiveQuantize = document.getElementById('btnLiveQuantize');
+
+    // Controls DOM - Tempo & Metronome
     const bpmSlider = document.getElementById('bpmSlider');
     const bpmDisplay = document.getElementById('bpmDisplay');
     const btnBpmMinus = document.getElementById('btnBpmMinus');
     const btnBpmPlus = document.getElementById('btnBpmPlus');
     const btnTapTempo = document.getElementById('btnTapTempo');
-    const zoomSlider = document.getElementById('zoomSlider');
-    const btnPlayPause = document.getElementById('btnPlayPause');
-    const btnRewind = document.getElementById('btnRewind');
-    const btnClearTab = document.getElementById('btnClearTab');
     const btnMetronomeSound = document.getElementById('btnMetronomeSound');
+    const zoomSlider = document.getElementById('zoomSlider');
+
+    // Controls DOM - Tuning, Ergonomics, Noise Gate, Demo
     const selectTuning = document.getElementById('selectTuning');
     const selectErgoMode = document.getElementById('selectErgoMode');
-    const selectDemoSong = document.getElementById('selectDemoSong');
-    const btnPlayDemo = document.getElementById('btnPlayDemo');
-    const btnExportASCII = document.getElementById('btnExportASCII');
     const noiseGateSlider = document.getElementById('noiseGateSlider');
     const noiseGateVal = document.getElementById('noiseGateVal');
-    const asciiModal = document.getElementById('asciiModal');
+    const selectDemoSong = document.getElementById('selectDemoSong');
+    const btnPlayDemo = document.getElementById('btnPlayDemo');
+
+    // Controls DOM - Multi-Format Exporter Modal
+    const btnOpenExportModal = document.getElementById('btnOpenExportModal');
+    const exportModal = document.getElementById('exportModal');
+    const btnCloseModal = document.getElementById('btnCloseModal');
+    const exportTabBtns = document.querySelectorAll('.export-tab-btn');
+    const exportPanels = {
+        ascii: document.getElementById('panelAscii'),
+        musicxml: document.getElementById('panelMusicXML'),
+        json: document.getElementById('panelJSON'),
+        midi: document.getElementById('panelMIDI')
+    };
+
     const asciiContent = document.getElementById('asciiContent');
     const btnCopyAscii = document.getElementById('btnCopyAscii');
-    const btnCloseModal = document.getElementById('btnCloseModal');
+    const btnDownloadAscii = document.getElementById('btnDownloadAscii');
+
+    const musicxmlContent = document.getElementById('musicxmlContent');
+    const btnCopyMusicXML = document.getElementById('btnCopyMusicXML');
+    const btnDownloadMusicXML = document.getElementById('btnDownloadMusicXML');
+
+    const jsonContent = document.getElementById('jsonContent');
+    const btnCopyJSON = document.getElementById('btnCopyJSON');
+    const btnDownloadJSON = document.getElementById('btnDownloadJSON');
+
+    const midiTempoDisplay = document.getElementById('midiTempoDisplay');
+    const midiNotesDisplay = document.getElementById('midiNotesDisplay');
+    const btnDownloadMIDI = document.getElementById('btnDownloadMIDI');
 
     // Start tablature auto-scroll by default
     tablature.play();
 
     // =========================================================================
-    // Core Audio & Optimization Flow (Phases 1, 2, 3)
+    // Core Audio & Optimization Flow (DSP -> Optimizer -> Visualizers)
     // =========================================================================
 
     /**
@@ -89,23 +185,34 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleDetectedPluck(data) {
         // Run Optimizer (Phase 2) to find best (string, fret) & finger assignment
         const result = optimizer.optimize(data.midi);
-
         if (!result) return; // Out of playable range
 
         // 1. Light up Fretboard Visualizer
         fretboard.lightUpNote(result.string, result.fret, result.noteName + result.octave, result.finger);
 
-        // 2. Print onto Auto-Scrolling Tablature Staff
+        // 2. Print onto Auto-Scrolling Tablature Staff with timestamp capture
         tablature.recordNote({
             string: result.string,
             fret: result.fret,
             finger: result.finger,
-            noteName: result.noteName + result.octave
+            noteName: result.noteName + result.octave,
+            midi: data.midi,
+            rawTime: tablature.currentTime
         });
 
         // 3. Update Hand Position UI indicator
         if (handPosBadge) {
             handPosBadge.textContent = `Pos: Fret ${result.handPosition}`;
+        }
+    }
+
+    /**
+     * Handles note-off event from DSP when signal drops below noise gate.
+     */
+    function handleDetectedNoteOff() {
+        // Finalize active notes across ringing strings
+        for (let s = 1; s <= 6; s++) {
+            tablature.releaseNote(s);
         }
     }
 
@@ -126,7 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const cents = data.cents;
             centsDisplay.textContent = (cents > 0 ? `+${cents}` : `${cents}`) + '¢';
             
-            // Tuner needle rotation (-50 to +50 cents maps to -45deg to +45deg)
+            // Needle rotation (-50 to +50 cents -> -45deg to +45deg)
             const angle = Math.max(-45, Math.min(45, cents * 0.9));
             tunerNeedle.style.transform = `translateX(-50%) rotate(${angle}deg)`;
 
@@ -173,9 +280,9 @@ document.addEventListener('DOMContentLoaded', () => {
      * Interactive Click on Fretboard:
      * User clicks any fret/string -> synthesizes sound, lights up, records tab!
      */
-    function handleFretboardClick(string, fret) {
-        // Initialize Web Audio if needed
-        dsp.initAudioContext();
+    async function handleFretboardClick(string, fret) {
+        await dsp.initAudioContext();
+        await synth.initAudioContext();
 
         const strIdx = string - 1;
         const openMidi = optimizer.openMidi[strIdx];
@@ -189,25 +296,27 @@ document.addEventListener('DOMContentLoaded', () => {
         // Compute finger based on current hand anchor
         const finger = optimizer.assignFinger(fret, optimizer.handAnchorFret);
 
-        // 1. Play realistic physical Karplus-Strong string synthesis
-        dsp.playGuitarPluck(midi, 1.8, 0.85);
+        // 1. Play sound via Karplus-Strong string synthesis or PolySynth
+        synth.playNote(midi, 1.8, 0.85, string);
 
         // 2. Light up fretboard
         fretboard.lightUpNote(string, fret, fullNoteName, finger);
 
-        // 3. Record note on scrolling tab
+        // 3. Record note on scrolling tab with raw timestamp
         tablature.recordNote({
             string: string,
             fret: fret,
             finger: finger,
-            noteName: fullNoteName
+            noteName: fullNoteName,
+            midi: midi,
+            rawTime: tablature.currentTime
         });
 
         // 4. Update UI
         updatePitchUI({
             noteName: noteName,
             octave: octave,
-            frequency: dsp.midiToFrequency(midi),
+            frequency: synth.midiToFrequency(midi),
             cents: 0
         });
 
@@ -242,10 +351,197 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // =========================================================================
-    // UI Event Handlers & Control Binding
+    // Feature 1: Rhythmic Quantization Controls
     // =========================================================================
 
-    // 1. Microphone Toggle Button
+    // Grid selector
+    if (selectQuantizeGrid) {
+        selectQuantizeGrid.addEventListener('change', (e) => {
+            const grid = e.target.value;
+            quantizer.setGrid(grid);
+        });
+    }
+
+    // Quantize Now button
+    if (btnQuantizeNow) {
+        btnQuantizeNow.addEventListener('click', () => {
+            const grid = selectQuantizeGrid ? selectQuantizeGrid.value : '16th';
+            tablature.quantizeNotes(grid);
+            btnQuantizeNow.innerHTML = '<span class="icon">✓</span> Quantized!';
+            setTimeout(() => {
+                btnQuantizeNow.innerHTML = '<span class="icon">⚡</span> Quantize Tab';
+            }, 1200);
+        });
+    }
+
+    // Live Quantize toggle button
+    if (btnLiveQuantize) {
+        btnLiveQuantize.addEventListener('click', () => {
+            quantizer.liveQuantize = !quantizer.liveQuantize;
+            btnLiveQuantize.classList.toggle('active', quantizer.liveQuantize);
+            btnLiveQuantize.innerHTML = quantizer.liveQuantize
+                ? '<span class="icon">🎯</span> Live: ON'
+                : '<span class="icon">🎯</span> Live: OFF';
+        });
+    }
+
+    // =========================================================================
+    // Feature 2: Audio Playback (Synth Engine) & Tab Scrubbing
+    // =========================================================================
+
+    if (btnPlayBack) {
+        btnPlayBack.addEventListener('click', async () => {
+            // Stop demo if running
+            if (isDemoPlaying) {
+                clearTimeout(demoPlaybackTimer);
+                isDemoPlaying = false;
+                if (btnPlayDemo) btnPlayDemo.innerHTML = '<span class="icon">▶</span> Play Demo';
+            }
+
+            if (tablature.notes.length === 0) {
+                alert('No notes on the tablature to play! Pluck notes on the fretboard, use keys 1-6 / A-K, or load a demo riff.');
+                return;
+            }
+
+            await synth.initAudioContext();
+            playbackController.togglePlayback();
+        });
+    }
+
+    if (selectSynthSound) {
+        selectSynthSound.addEventListener('change', (e) => {
+            synth.setSoundEngine(e.target.value);
+        });
+    }
+
+    // =========================================================================
+    // Feature 3: Multi-Format Score Exporter (ASCII, MusicXML, JSON, MIDI)
+    // =========================================================================
+
+    function refreshExportModalContent() {
+        const notes = tablature.notes;
+        const bpm = tablature.bpm;
+
+        exporter.bpm = bpm;
+        exporter.tuning = {
+            name: selectTuning.options[selectTuning.selectedIndex]?.text || 'Standard',
+            strings: optimizer.openMidi,
+            names: tablature.stringNames
+        };
+
+        // 1. ASCII Tab
+        if (asciiContent) {
+            asciiContent.value = exporter.toASCII(notes, bpm);
+        }
+
+        // 2. MusicXML
+        if (musicxmlContent) {
+            musicxmlContent.value = exporter.toMusicXML(notes, bpm);
+        }
+
+        // 3. Structured JSON
+        if (jsonContent) {
+            jsonContent.value = exporter.toJSON(notes, bpm);
+        }
+
+        // 4. MIDI Details
+        if (midiTempoDisplay) midiTempoDisplay.textContent = `${bpm} BPM`;
+        if (midiNotesDisplay) midiNotesDisplay.textContent = `${notes.length} notes`;
+    }
+
+    if (btnOpenExportModal) {
+        btnOpenExportModal.addEventListener('click', () => {
+            refreshExportModalContent();
+            if (exportModal) exportModal.classList.add('open');
+        });
+    }
+
+    // Tab switching in Export Modal
+    exportTabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            exportTabBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            const tabKey = btn.dataset.tab;
+            Object.keys(exportPanels).forEach(key => {
+                if (exportPanels[key]) {
+                    exportPanels[key].classList.toggle('active', key === tabKey);
+                }
+            });
+        });
+    });
+
+    // ASCII Actions
+    if (btnCopyAscii && asciiContent) {
+        btnCopyAscii.addEventListener('click', () => {
+            navigator.clipboard.writeText(asciiContent.value).then(() => {
+                btnCopyAscii.textContent = 'Copied!';
+                setTimeout(() => btnCopyAscii.textContent = 'Copy to Clipboard', 1500);
+            });
+        });
+    }
+    if (btnDownloadAscii && asciiContent) {
+        btnDownloadAscii.addEventListener('click', () => {
+            exporter.downloadTextFile(asciiContent.value, 'text/plain', 'guitar_tab.txt');
+        });
+    }
+
+    // MusicXML Actions
+    if (btnCopyMusicXML && musicxmlContent) {
+        btnCopyMusicXML.addEventListener('click', () => {
+            navigator.clipboard.writeText(musicxmlContent.value).then(() => {
+                btnCopyMusicXML.textContent = 'Copied!';
+                setTimeout(() => btnCopyMusicXML.textContent = 'Copy XML', 1500);
+            });
+        });
+    }
+    if (btnDownloadMusicXML && musicxmlContent) {
+        btnDownloadMusicXML.addEventListener('click', () => {
+            exporter.downloadTextFile(musicxmlContent.value, 'application/xml', 'guitar_score.musicxml');
+        });
+    }
+
+    // JSON Actions
+    if (btnCopyJSON && jsonContent) {
+        btnCopyJSON.addEventListener('click', () => {
+            navigator.clipboard.writeText(jsonContent.value).then(() => {
+                btnCopyJSON.textContent = 'Copied!';
+                setTimeout(() => btnCopyJSON.textContent = 'Copy JSON', 1500);
+            });
+        });
+    }
+    if (btnDownloadJSON && jsonContent) {
+        btnDownloadJSON.addEventListener('click', () => {
+            exporter.downloadTextFile(jsonContent.value, 'application/json', 'guitar_score.json');
+        });
+    }
+
+    // MIDI File Download
+    if (btnDownloadMIDI) {
+        btnDownloadMIDI.addEventListener('click', () => {
+            exporter.downloadMIDI(tablature.notes, tablature.bpm, 'guitar_transcription.mid');
+        });
+    }
+
+    // Modal Close
+    if (btnCloseModal && exportModal) {
+        btnCloseModal.addEventListener('click', () => {
+            exportModal.classList.remove('open');
+        });
+    }
+    if (exportModal) {
+        exportModal.addEventListener('click', (e) => {
+            if (e.target === exportModal) {
+                exportModal.classList.remove('open');
+            }
+        });
+    }
+
+    // =========================================================================
+    // General UI Controls & Interactions
+    // =========================================================================
+
+    // Microphone Toggle Button
     btnMicToggle.addEventListener('click', async () => {
         if (!isMicActive) {
             btnMicToggle.textContent = 'Connecting...';
@@ -271,33 +567,44 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // 2. Play / Pause Tab Scroll
+    // Play / Pause Tab Scroll
     btnPlayPause.addEventListener('click', () => {
+        if (playbackController.isPlaying) {
+            playbackController.stopPlayback();
+        }
         const playing = tablature.togglePlay();
         btnPlayPause.innerHTML = playing 
-            ? '<span class="icon">⏸</span> Pause' 
-            : '<span class="icon">▶</span> Play';
+            ? '<span class="icon">⏸</span> Pause Scroll' 
+            : '<span class="icon">▶</span> Resume Scroll';
         btnPlayPause.classList.toggle('btn-primary', !playing);
     });
 
-    // 3. Rewind Tab
+    // Rewind Tab
     btnRewind.addEventListener('click', () => {
+        if (playbackController.isPlaying) {
+            playbackController.stopPlayback();
+        }
         tablature.rewind();
     });
 
-    // 4. Clear Tab
+    // Clear Tab
     btnClearTab.addEventListener('click', () => {
         if (confirm('Clear all recorded tablature notes?')) {
+            if (playbackController.isPlaying) {
+                playbackController.stopPlayback();
+            }
             tablature.clearNotes();
         }
     });
 
-    // 5. BPM / Tempo Controls
+    // BPM / Tempo Controls
     function updateBPM(val) {
         val = Math.max(30, Math.min(300, parseInt(val, 10) || 120));
         bpmSlider.value = val;
         bpmDisplay.textContent = `${val} BPM`;
         tablature.setBPM(val);
+        quantizer.setBPM(val);
+        exporter.bpm = val;
     }
 
     bpmSlider.addEventListener('input', (e) => updateBPM(e.target.value));
@@ -315,7 +622,6 @@ document.addEventListener('DOMContentLoaded', () => {
             for (let i = 1; i < tapTimes.length; i++) {
                 intervals.push(tapTimes[i] - tapTimes[i - 1]);
             }
-            // Filter out taps spaced more than 2.5s apart
             intervals = intervals.filter(t => t < 2500);
             if (intervals.length > 0) {
                 const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
@@ -325,12 +631,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // 6. Zoom Staff Spacing
+    // Zoom Staff Spacing
     zoomSlider.addEventListener('input', (e) => {
         tablature.setZoom(parseInt(e.target.value, 10));
     });
 
-    // 7. Metronome Sound Toggle
+    // Metronome Sound Toggle
     btnMetronomeSound.addEventListener('click', () => {
         isMetronomeSoundOn = !isMetronomeSoundOn;
         btnMetronomeSound.classList.toggle('active', isMetronomeSoundOn);
@@ -339,11 +645,10 @@ document.addEventListener('DOMContentLoaded', () => {
             : '<span class="icon">🔕</span> Click Muted';
     });
 
-    // 8. Guitar Tuning Selector
+    // Guitar Tuning Selector
     selectTuning.addEventListener('change', (e) => {
         const val = e.target.value;
         optimizer.setTuning(val);
-        // Update fretboard string tuning labels
         const tuningLabels = {
             standard: ["e", "B", "G", "D", "A", "E"],
             dropD:    ["e", "B", "G", "D", "A", "D"],
@@ -352,37 +657,42 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         fretboard.stringNames = tuningLabels[val] || tuningLabels.standard;
         tablature.stringNames = tuningLabels[val] || tuningLabels.standard;
+        exporter.tuning.names = tuningLabels[val] || tuningLabels.standard;
+        exporter.tuning.strings = optimizer.openMidi;
     });
 
-    // 9. Ergonomic Mode Selector
+    // Ergonomic Mode Selector
     selectErgoMode.addEventListener('change', (e) => {
         optimizer.setMode(e.target.value);
     });
 
-    // 10. Noise Gate Slider
+    // Noise Gate Slider
     noiseGateSlider.addEventListener('input', (e) => {
         const val = parseFloat(e.target.value);
         dsp.noiseGateRMS = val;
         noiseGateVal.textContent = val.toFixed(3);
     });
 
-    // 11. Demo Song Player
+    // Demo Song Player
     btnPlayDemo.addEventListener('click', () => {
         dsp.initAudioContext();
+        synth.initAudioContext();
         const songKey = selectDemoSong.value;
         const song = DEMO_SONGS[songKey];
         if (!song) return;
 
-        // If currently playing, stop
         if (isDemoPlaying) {
             clearTimeout(demoPlaybackTimer);
             isDemoPlaying = false;
-            btnPlayDemo.innerHTML = '<span class="icon">▶</span> Play Demo Riff';
+            btnPlayDemo.innerHTML = '<span class="icon">▶</span> Play Demo';
             btnPlayDemo.classList.remove('btn-danger');
             return;
         }
 
-        // Set tempo and load notes to tablature staff
+        if (playbackController.isPlaying) {
+            playbackController.stopPlayback();
+        }
+
         updateBPM(song.bpm);
         tablature.clearNotes();
         tablature.loadSong(song.notes, song.bpm);
@@ -392,12 +702,11 @@ document.addEventListener('DOMContentLoaded', () => {
         btnPlayDemo.innerHTML = '<span class="icon">⏹</span> Stop Demo';
         btnPlayDemo.classList.add('btn-danger');
 
-        // Play each note with acoustic synthesis and fretboard lighting!
         const startTime = performance.now();
         const scheduleNote = (idx) => {
             if (!isDemoPlaying || idx >= song.notes.length) {
                 isDemoPlaying = false;
-                btnPlayDemo.innerHTML = '<span class="icon">▶</span> Play Demo Riff';
+                btnPlayDemo.innerHTML = '<span class="icon">▶</span> Play Demo';
                 btnPlayDemo.classList.remove('btn-danger');
                 return;
             }
@@ -411,13 +720,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const openMidi = optimizer.openMidi[n.string - 1];
                 const midi = openMidi + n.fret;
 
-                dsp.playGuitarPluck(midi, n.duration * 1.5, 0.85);
+                synth.playNote(midi, n.duration * 1.5, 0.85, n.string);
                 fretboard.lightUpNote(n.string, n.fret, n.noteName, n.finger);
 
                 updatePitchUI({
                     noteName: n.noteName.slice(0, -1),
                     octave: parseInt(n.noteName.slice(-1), 10) || 4,
-                    frequency: dsp.midiToFrequency(midi),
+                    frequency: synth.midiToFrequency(midi),
                     cents: 0
                 });
 
@@ -428,37 +737,7 @@ document.addEventListener('DOMContentLoaded', () => {
         scheduleNote(0);
     });
 
-    // 12. Export ASCII Tablature Modal
-    btnExportASCII.addEventListener('click', () => {
-        const ascii = tablature.exportASCII();
-        asciiContent.value = ascii;
-        asciiModal.classList.add('open');
-    });
-
-    btnCopyAscii.addEventListener('click', () => {
-        asciiContent.select();
-        navigator.clipboard.writeText(asciiContent.value).then(() => {
-            btnCopyAscii.textContent = 'Copied to Clipboard!';
-            setTimeout(() => {
-                btnCopyAscii.textContent = 'Copy to Clipboard';
-            }, 1800);
-        });
-    });
-
-    btnCloseModal.addEventListener('click', () => {
-        asciiModal.classList.remove('open');
-    });
-
-    // Close modal on background click
-    asciiModal.addEventListener('click', (e) => {
-        if (e.target === asciiModal) {
-            asciiModal.classList.remove('open');
-        }
-    });
-
-    // 13. Computer Keyboard Controls
-    // Strings 1-6 open notes on keys 1-6
-    // Musical keys on keyboard for testing without guitar or mouse!
+    // Computer Keyboard Shortcuts
     const keyMap = {
         '1': { string: 1, fret: 0 },
         '2': { string: 2, fret: 0 },
@@ -466,7 +745,7 @@ document.addEventListener('DOMContentLoaded', () => {
         '4': { string: 4, fret: 0 },
         '5': { string: 5, fret: 0 },
         '6': { string: 6, fret: 0 },
-        // A Minor Pentatonic Box keys (A, S, D, F, G, H, J, K)
+        // A Minor Pentatonic Box (A, S, D, F, G, H, J, K)
         'a': { string: 6, fret: 5 },
         's': { string: 6, fret: 8 },
         'd': { string: 5, fret: 5 },
@@ -480,12 +759,23 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     window.addEventListener('keydown', (e) => {
-        // Ignore if user is inside an input/textarea
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
         if (e.code === 'Space') {
             e.preventDefault();
             btnPlayPause.click();
+            return;
+        }
+
+        if (e.key.toLowerCase() === 'p') {
+            e.preventDefault();
+            btnPlayBack.click();
+            return;
+        }
+
+        if (e.key.toLowerCase() === 'q') {
+            e.preventDefault();
+            btnQuantizeNow.click();
             return;
         }
 

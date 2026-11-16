@@ -32,6 +32,9 @@ class TablatureStaff {
         this.notes = [];
         this.activePluckedNotes = new Map(); // string => note object (for duration tracking)
 
+        // Rhythm Quantizer reference
+        this.quantizer = options.quantizer || null;
+
         // String labels & order: String 1 is high e (top), String 6 is low E (bottom)
         this.stringNames = ["e", "B", "G", "D", "A", "E"];
 
@@ -164,17 +167,31 @@ class TablatureStaff {
     }
 
     /**
-     * Records a note event at the current timeline position.
-     * @param {Object} noteData - { string (1-6), fret, finger, noteName }
+     * Records a note event at the current timeline position, capturing raw timestamps.
+     * @param {Object} noteData - { string (1-6), fret, finger, noteName, midi, rawTime, rawDuration }
      */
     recordNote(noteData) {
-        const { string, fret, finger, noteName, color } = noteData;
+        const { string, fret, finger, noteName, color, midi } = noteData;
         const nowTime = this.currentTime;
+        const rawTime = (typeof noteData.rawTime === 'number') ? noteData.rawTime : nowTime;
 
-        // Check if there's already an open note on this string to finalize its duration
+        // Finalize previous note on this string
         if (this.activePluckedNotes.has(string)) {
             const prev = this.activePluckedNotes.get(string);
-            prev.duration = Math.max(0.1, nowTime - prev.time);
+            prev.rawEndTime = rawTime;
+            prev.rawDuration = Math.max(0.06, rawTime - prev.rawTime);
+            if (this.quantizer && this.quantizer.liveQuantize && this.quantizer.grid !== 'none') {
+                prev.duration = this.quantizer.quantizeDuration(prev.rawDuration, this.quantizer.grid, this.bpm);
+            } else {
+                prev.duration = prev.rawDuration;
+            }
+        }
+
+        let calculatedTime = rawTime;
+        let calculatedDur = 0.35;
+        if (this.quantizer && this.quantizer.liveQuantize && this.quantizer.grid !== 'none') {
+            calculatedTime = this.quantizer.quantizeTime(rawTime, this.quantizer.grid, this.bpm);
+            calculatedDur = this.quantizer.quantizeDuration(0.35, this.quantizer.grid, this.bpm);
         }
 
         const newNote = {
@@ -183,8 +200,12 @@ class TablatureStaff {
             fret: fret,
             finger: finger || 0,
             noteName: noteName || '',
-            time: nowTime,
-            duration: 0.35, // Default quarter-note sustain placeholder
+            midi: midi,
+            rawTime: rawTime,
+            rawDuration: calculatedDur,
+            rawEndTime: rawTime + calculatedDur,
+            time: calculatedTime,
+            duration: calculatedDur,
             color: color || '#38bdf8'
         };
 
@@ -194,13 +215,28 @@ class TablatureStaff {
     }
 
     /**
-     * Releases active note to set duration.
+     * Releases active note to finalize its raw duration and end time.
      */
     releaseNote(string) {
         if (this.activePluckedNotes.has(string)) {
             const note = this.activePluckedNotes.get(string);
-            note.duration = Math.max(0.15, this.currentTime - note.time);
+            note.rawEndTime = this.currentTime;
+            note.rawDuration = Math.max(0.06, this.currentTime - note.rawTime);
+            if (this.quantizer && this.quantizer.liveQuantize && this.quantizer.grid !== 'none') {
+                note.duration = this.quantizer.quantizeDuration(note.rawDuration, this.quantizer.grid, this.bpm);
+            } else {
+                note.duration = note.rawDuration;
+            }
             this.activePluckedNotes.delete(string);
+        }
+    }
+
+    /**
+     * Quantizes all notes currently recorded on the staff.
+     */
+    quantizeNotes(gridType = '16th') {
+        if (this.quantizer) {
+            this.quantizer.quantizeNotes(this.notes, gridType, this.bpm);
         }
     }
 
@@ -505,9 +541,26 @@ class TablatureStaff {
     }
 
     /**
-     * Exports recorded notes as standard ASCII guitar tablature text.
+     * Exports recorded notes as standard ASCII guitar tablature text (80 chars wide per block).
      */
     exportASCII() {
+        const ExporterClass = (typeof GuitarExporter !== 'undefined')
+            ? GuitarExporter
+            : (typeof require !== 'undefined' ? require('./exporter.js') : null);
+
+        if (ExporterClass) {
+            const exp = new ExporterClass({
+                bpm: this.bpm,
+                tuning: {
+                    name: 'Current Tuning',
+                    strings: [64, 59, 55, 50, 45, 40],
+                    names: this.stringNames
+                }
+            });
+            return exp.toASCII(this.notes, this.bpm);
+        }
+
+        // Fallback 80-character wide formatter
         const secondsPerBeat = 60 / this.bpm;
         const totalDuration = this.notes.length > 0 
             ? Math.max(...this.notes.map(n => n.time + n.duration)) + 1
@@ -525,14 +578,16 @@ class TablatureStaff {
             }
         }
 
-        let output = `// Auto-generated Tablature (BPM: ${this.bpm}, Time: 4/4)\n\n`;
-        const chunkSize = 64; // Characters per staff row
+        let output = `================================================================================\n`;
+        output += `GUITAR TABLATURE (BPM: ${this.bpm}, Time: 4/4)\n`;
+        output += `================================================================================\n\n`;
+        const chunkSize = 76;
 
         for (let start = 0; start < totalSixteenths; start += chunkSize) {
             const end = Math.min(start + chunkSize, totalSixteenths);
             for (let s = 0; s < 6; s++) {
-                const line = grid[s].slice(start, end).join('');
-                output += `${this.stringNames[s]}|-${line}-|\n`;
+                const line = grid[s].slice(start, end).join('').padEnd(chunkSize, '-');
+                output += `${this.stringNames[s]}|${line}|\n`;
             }
             output += '\n';
         }

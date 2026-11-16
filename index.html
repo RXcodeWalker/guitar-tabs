@@ -97,16 +97,43 @@
 
         <!-- 4. Control Toolbar & Parameters Dock -->
         <section class="control-dock">
-            <!-- Playback & Scroll -->
+            <!-- Playback, Synthesis & Staff Scroll -->
             <div class="control-group">
-                <button id="btnPlayPause" class="btn">
-                    <span class="icon">⏸</span> Pause
+                <button id="btnPlayBack" class="btn btn-accent" title="Read generated tablature and play it back audibly with animated playhead scrubbing">
+                    <span class="icon">▶️</span> Play Back
                 </button>
-                <button id="btnRewind" class="btn">
+                <button id="btnPlayPause" class="btn" title="Pause or resume auto-scrolling staff">
+                    <span class="icon">⏸</span> Pause Scroll
+                </button>
+                <button id="btnRewind" class="btn" title="Rewind timeline to measure 1">
                     <span class="icon">⏮</span> Rewind
                 </button>
-                <button id="btnClearTab" class="btn">
-                    <span class="icon">🗑</span> Clear Tab
+                <button id="btnClearTab" class="btn" title="Clear all recorded tablature notes">
+                    <span class="icon">🗑</span> Clear
+                </button>
+                <span class="group-label">Synth</span>
+                <select id="selectSynthSound" class="select-input" title="Playback Audio Synthesis Engine">
+                    <option value="karplus">Karplus-Strong String</option>
+                    <option value="polysynth">Poly Clean Synth</option>
+                </select>
+            </div>
+
+            <!-- Rhythm & Quantization -->
+            <div class="control-group">
+                <span class="group-label">Quantize</span>
+                <select id="selectQuantizeGrid" class="select-input" title="Rhythm Quantization Grid">
+                    <option value="none">Off (Raw Timestamps)</option>
+                    <option value="16th" selected>1/16 Note (Sixteenth)</option>
+                    <option value="8th">1/8 Note (Eighth)</option>
+                    <option value="quarterTriplet">1/4 Note Triplet</option>
+                    <option value="eighthTriplet">1/8 Note Triplet</option>
+                    <option value="quarter">1/4 Note (Quarter)</option>
+                </select>
+                <button id="btnQuantizeNow" class="btn" title="Quantize current recorded tab notes to selected grid">
+                    <span class="icon">⚡</span> Quantize Tab
+                </button>
+                <button id="btnLiveQuantize" class="btn" title="Toggle real-time quantization for incoming notes">
+                    <span class="icon">🎯</span> Live: OFF
                 </button>
             </div>
 
@@ -157,7 +184,7 @@
                 <span id="noiseGateVal" class="val-badge" style="min-width: 45px;">0.008</span>
             </div>
 
-            <!-- Demo Riffs & Export -->
+            <!-- Demo Riffs & Multi-Format Exporter -->
             <div class="control-group">
                 <span class="group-label">Demo Riffs</span>
                 <select id="selectDemoSong" class="select-input">
@@ -167,10 +194,10 @@
                     <option value="nothingElseMatters">Nothing Else Matters (Metallica)</option>
                 </select>
                 <button id="btnPlayDemo" class="btn btn-primary">
-                    <span class="icon">▶</span> Play Demo Riff
+                    <span class="icon">▶</span> Play Demo
                 </button>
-                <button id="btnExportASCII" class="btn">
-                    <span class="icon">📄</span> Export Tab
+                <button id="btnOpenExportModal" class="btn btn-accent" title="Export to ASCII, MusicXML, JSON, or MIDI">
+                    <span class="icon">📤</span> Export Score...
                 </button>
             </div>
         </section>
@@ -187,28 +214,97 @@
                     <span>Pentatonic Scale Run</span>
                 </div>
                 <div class="guide-item">
-                    <kbd>Space</kbd> <span>Play/Pause</span>
+                    <kbd>Space</kbd> <span>Play/Pause Scroll</span>
+                </div>
+                <div class="guide-item">
+                    <kbd>P</kbd> <span>Play Back Synth</span>
+                </div>
+                <div class="guide-item">
+                    <kbd>Q</kbd> <span>Quantize Tab</span>
                 </div>
                 <div class="guide-item">
                     <kbd>R</kbd> <span>Rewind</span>
                 </div>
             </div>
             <div>
-                <span>Phase 1 (DSP) + Phase 2 (Optimization) + Phase 3 (Canvas Visualizer) Fully Integrated</span>
+                <span>Quantization + Karplus-Strong Audio Playback + Multi-Format Exporter (ASCII, MusicXML, JSON, MIDI)</span>
             </div>
         </footer>
     </div>
 
-    <!-- 6. ASCII Tablature Export Modal -->
-    <div id="asciiModal" class="modal-overlay">
+    <!-- 6. Multi-Format Tablature & Score Exporter Modal -->
+    <div id="exportModal" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 class="modal-title">Exported Guitar Tablature (ASCII)</h3>
+                <div>
+                    <h3 class="modal-title">Export Guitar Score</h3>
+                    <div style="font-size: 12px; color: var(--text-muted);">Compatible with Guitar Pro, MuseScore, TuxGuitar, and Digital Audio Workstations</div>
+                </div>
                 <button id="btnCloseModal" class="btn btn-icon-only">✕</button>
             </div>
-            <textarea id="asciiContent" class="modal-textarea" readonly></textarea>
-            <div class="modal-footer">
-                <button id="btnCopyAscii" class="btn btn-primary">Copy to Clipboard</button>
+
+            <!-- Format Tabs -->
+            <div class="export-tabs">
+                <button class="export-tab-btn active" data-tab="ascii">📄 ASCII Tab (80-col)</button>
+                <button class="export-tab-btn" data-tab="musicxml">🎼 MusicXML (.musicxml)</button>
+                <button class="export-tab-btn" data-tab="json">📊 Structured JSON</button>
+                <button class="export-tab-btn" data-tab="midi">🎹 MIDI File (.mid)</button>
+            </div>
+
+            <!-- Tab 1: ASCII Tablature -->
+            <div id="panelAscii" class="export-panel active">
+                <div class="export-info-bar">
+                    <span>Standard formatted guitar tablature (80 characters wide per block with bar lines).</span>
+                </div>
+                <textarea id="asciiContent" class="modal-textarea" readonly></textarea>
+                <div class="modal-footer">
+                    <button id="btnCopyAscii" class="btn">Copy to Clipboard</button>
+                    <button id="btnDownloadAscii" class="btn btn-primary">Download .txt</button>
+                </div>
+            </div>
+
+            <!-- Tab 2: MusicXML -->
+            <div id="panelMusicXML" class="export-panel">
+                <div class="export-info-bar">
+                    <span>MusicXML 3.1 Partwise score with 6-string TAB clef, frets, and string technical notations.</span>
+                </div>
+                <textarea id="musicxmlContent" class="modal-textarea" readonly></textarea>
+                <div class="modal-footer">
+                    <button id="btnCopyMusicXML" class="btn">Copy XML</button>
+                    <button id="btnDownloadMusicXML" class="btn btn-primary">Download .musicxml</button>
+                </div>
+            </div>
+
+            <!-- Tab 3: Structured JSON -->
+            <div id="panelJSON" class="export-panel">
+                <div class="export-info-bar">
+                    <span>Structured JSON data schema containing measures, beats, notes, fretboard coordinates, and timing.</span>
+                </div>
+                <textarea id="jsonContent" class="modal-textarea" readonly></textarea>
+                <div class="modal-footer">
+                    <button id="btnCopyJSON" class="btn">Copy JSON</button>
+                    <button id="btnDownloadJSON" class="btn btn-primary">Download .json</button>
+                </div>
+            </div>
+
+            <!-- Tab 4: Client-Side MIDI File -->
+            <div id="panelMIDI" class="export-panel">
+                <div class="midi-card">
+                    <div class="midi-card-icon">🎹</div>
+                    <h4>Pure Client-Side Standard MIDI File (SMF Type 0)</h4>
+                    <p style="font-size: 13px; color: var(--text-secondary); max-width: 520px;">
+                        Generates a downloadable binary .mid file encoded directly in your browser. Includes tempo meta events, guitar acoustic/electric patch, and precise note-on/note-off timing.
+                    </p>
+                    <div class="midi-details-grid">
+                        <div class="midi-detail-item">Format<strong>SMF Type 0</strong></div>
+                        <div class="midi-detail-item">Resolution<strong>480 PPQ</strong></div>
+                        <div class="midi-detail-item">Tempo<strong id="midiTempoDisplay">120 BPM</strong></div>
+                        <div class="midi-detail-item">Total Notes<strong id="midiNotesDisplay">0</strong></div>
+                    </div>
+                    <button id="btnDownloadMIDI" class="btn btn-accent" style="padding: 12px 28px; font-size: 14px;">
+                        <span class="icon">💾</span> Download .MID File
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -216,6 +312,9 @@
     <!-- Application Scripts -->
     <script src="js/dsp.js"></script>
     <script src="js/optimizer.js"></script>
+    <script src="js/quantizer.js"></script>
+    <script src="js/synth.js"></script>
+    <script src="js/exporter.js"></script>
     <script src="js/fretboard.js"></script>
     <script src="js/tablature.js"></script>
     <script src="js/demo-songs.js"></script>

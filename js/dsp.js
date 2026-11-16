@@ -34,6 +34,7 @@ class GuitarDSP {
         // Callback hooks
         this.onPitchDetected = options.onPitchDetected || null;
         this.onPluck = options.onPluck || null;
+        this.onNoteOff = options.onNoteOff || null;
         this.onSilence = options.onSilence || null;
         this.onWaveformData = options.onWaveformData || null;
 
@@ -144,6 +145,12 @@ class GuitarDSP {
         if (rms < this.noiseGateRMS) {
             this.prevRMS = rms;
             this.pitchHistory = [];
+            if (this.lastDetectedMidi !== -1) {
+                if (this.onNoteOff) {
+                    this.onNoteOff({ time: currentTime, midi: this.lastDetectedMidi });
+                }
+                this.lastDetectedMidi = -1;
+            }
             if (this.onSilence) this.onSilence();
             return;
         }
