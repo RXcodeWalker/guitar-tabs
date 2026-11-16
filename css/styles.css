@@ -1911,3 +1911,119 @@ kbd {
 .fresh-dot  { background: #10b981; box-shadow: 0 0 6px #10b981; }
 .normal-dot { background: #00f3ff; box-shadow: 0 0 6px #00f3ff; }
 .worn-dot   { background: #ef4444; box-shadow: 0 0 6px #ef4444; }
+
+/* ==========================================================================
+   POLYPHONIC CHORD RECOGNITION & SCALE RECOMMENDATION HUD RIBBON
+   ========================================================================== */
+
+.chord-scale-ribbon {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 16px;
+    background: linear-gradient(180deg, #16161b 0%, #101014 100%);
+    border-bottom: 1px solid var(--chassis-border);
+    font-family: var(--font-sans);
+}
+
+.chord-detection-cluster {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.chord-badge {
+    font-family: var(--font-mono);
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--led-cyan);
+    background: rgba(0, 243, 255, 0.12);
+    border: 1.5px solid var(--led-cyan);
+    border-radius: var(--radius-sm);
+    padding: 3px 10px;
+    text-shadow: 0 0 8px var(--led-cyan-glow);
+    box-shadow: 0 0 12px rgba(0, 243, 255, 0.2);
+    letter-spacing: 0.5px;
+    min-width: 52px;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.chord-metric-pill {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: var(--radius-sm);
+    padding: 3px 8px;
+}
+
+.scale-recommendation-cluster {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 220px;
+}
+
+.scale-recommendation-pill {
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 700;
+    color: #ffd166;
+    background: rgba(255, 209, 102, 0.10);
+    border: 1px solid rgba(255, 209, 102, 0.35);
+    border-radius: var(--radius-sm);
+    padding: 4px 12px;
+    text-shadow: 0 0 8px rgba(255, 209, 102, 0.3);
+    white-space: nowrap;
+}
+
+.scale-tools-cluster {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.scale-legend-cluster {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-left: 8px;
+    border-left: 1px solid var(--chassis-border);
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.legend-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.dot-target {
+    background: #00f3ff;
+    box-shadow: 0 0 6px #00f3ff;
+    border: 1px solid #ffffff;
+}
+
+.dot-passing {
+    background: #10b981;
+    box-shadow: 0 0 5px #10b981;
+}
+
+.dot-avoid {
+    background: #ef4444;
+    box-shadow: 0 0 4px #ef4444;
+}

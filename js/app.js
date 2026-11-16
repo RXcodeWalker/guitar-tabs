@@ -23,13 +23,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 3. Initialize Audio DSP Engine (Phase 1)
     const dsp = new GuitarDSP({
         a4: 440,
+        fftSize: 8192,
         onPitchDetected: (data) => updatePitchUI(data),
         onPluck: (data) => handleDetectedPluck(data),
         onNoteOff: (data) => handleDetectedNoteOff(data),
         onSilence: () => handleSilenceUI(),
         onWaveformData: (buffer) => renderVUMeter(buffer),
-        onAudioMetrics: (metrics) => renderAudioMetrics(metrics)
+        onAudioMetrics: (metrics) => renderAudioMetrics(metrics),
+        onChromaData: (freqBytes, sampleRate) => handleLiveChordRecognition(freqBytes, sampleRate)
     });
+
+    // 3.5 Initialize Polyphonic Chord Recognizer
+    const chordRecognizer = (typeof ChordEngine !== 'undefined') ? 
+        new ChordEngine.PolyphonicChordRecognizer({
+            sampleRate: 44100,
+            stabilityThreshold: 3,
+            hysteresisMargin: 14
+        }) : null;
 
     // 4. Initialize Playback Synthesizer Engine (Karplus-Strong & PolySynth)
     const synth = new GuitarSynth({
@@ -260,6 +270,82 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Start tablature auto-scroll by default
     tablature.play();
+
+    // -------------------------------------------------------------------------
+    // Polyphonic Chord Recognition & Live Scale Overlay Wiring
+    // -------------------------------------------------------------------------
+    const detectedChordBadge = document.getElementById('detectedChordBadge');
+    const chordConfidenceBadge = document.getElementById('chordConfidenceBadge');
+    const chordRootBadge = document.getElementById('chordRootBadge');
+    const recommendedScaleBadge = document.getElementById('recommendedScaleBadge');
+    const selectTestChord = document.getElementById('selectTestChord');
+    const btnToggleScaleOverlay = document.getElementById('btnToggleScaleOverlay');
+    const selectOverlayMode = document.getElementById('selectOverlayMode');
+    const btnToggleAvoidNotes = document.getElementById('btnToggleAvoidNotes');
+
+    // Initialize with Am7 Scale Overlay (A Minor Pentatonic / A Dorian)
+    if (typeof ChordEngine !== 'undefined') {
+        const initialOverlay = ChordEngine.getScaleOverlay('Am7');
+        fretboard.setScaleOverlay(initialOverlay);
+    }
+
+    if (selectTestChord) {
+        selectTestChord.addEventListener('change', () => {
+            const chord = selectTestChord.value;
+            if (typeof ChordEngine !== 'undefined') {
+                const overlay = ChordEngine.getScaleOverlay(chord);
+                if (detectedChordBadge) detectedChordBadge.textContent = chord;
+                if (chordRootBadge) chordRootBadge.textContent = `Root: ${overlay.root || '--'}`;
+                if (chordConfidenceBadge) chordConfidenceBadge.textContent = '100% Sim';
+                if (recommendedScaleBadge) recommendedScaleBadge.textContent = overlay.scaleName;
+                fretboard.setScaleOverlay(overlay);
+                showToast(`Scale Overlay: ${overlay.scaleName}`);
+            }
+        });
+    }
+
+    if (btnToggleScaleOverlay) {
+        btnToggleScaleOverlay.addEventListener('click', () => {
+            fretboard.scaleOverlayVisible = !fretboard.scaleOverlayVisible;
+            btnToggleScaleOverlay.classList.toggle('active', fretboard.scaleOverlayVisible);
+            btnToggleScaleOverlay.innerHTML = `<span class="jewel-led ${fretboard.scaleOverlayVisible ? 'jewel-cyan' : ''}"></span> Overlay: ${fretboard.scaleOverlayVisible ? 'ON' : 'OFF'}`;
+        });
+    }
+
+    if (selectOverlayMode) {
+        selectOverlayMode.addEventListener('change', () => {
+            fretboard.scaleOverlayMode = selectOverlayMode.value;
+        });
+    }
+
+    if (btnToggleAvoidNotes) {
+        btnToggleAvoidNotes.addEventListener('click', () => {
+            fretboard.scaleOverlayShowAvoid = !fretboard.scaleOverlayShowAvoid;
+            btnToggleAvoidNotes.classList.toggle('active', fretboard.scaleOverlayShowAvoid);
+            btnToggleAvoidNotes.textContent = `Avoid: ${fretboard.scaleOverlayShowAvoid ? 'SHOW' : 'HIDE'}`;
+        });
+    }
+
+    let lastChordUpdateTime = 0;
+    function handleLiveChordRecognition(freqBytes, sampleRate) {
+        if (!chordRecognizer) return;
+        const now = performance.now();
+        if (now - lastChordUpdateTime < 60) return; // Cap UI refresh rate at ~16 Hz
+        lastChordUpdateTime = now;
+
+        const res = chordRecognizer.processFrame(freqBytes, sampleRate);
+        if (res.chord && res.chord !== 'None' && res.confidence >= 40) {
+            if (detectedChordBadge) detectedChordBadge.textContent = res.chord;
+            if (chordConfidenceBadge) chordConfidenceBadge.textContent = `${res.confidence}% Conf`;
+            if (chordRootBadge) chordRootBadge.textContent = res.root ? `Root: ${res.root}` : `Root: --`;
+
+            const overlay = ChordEngine.getScaleOverlay(res.chord);
+            if (recommendedScaleBadge) recommendedScaleBadge.textContent = overlay.scaleName;
+            fretboard.setScaleOverlay(overlay);
+        } else if (res.confidence < 25) {
+            if (chordConfidenceBadge) chordConfidenceBadge.textContent = `${res.confidence}% Conf`;
+        }
+    }
 
     // Populate microphone device dropdown
     async function populateAudioDevices() {
