@@ -347,6 +347,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             const overlay = ChordEngine.getScaleOverlay(res.chord);
             if (recommendedScaleBadge) recommendedScaleBadge.textContent = overlay.scaleName;
             fretboard.setScaleOverlay(overlay);
+
+            if (backingTrackEngine) {
+                backingTrackEngine.setLiveChord(res.chord);
+            }
         } else if (res.confidence < 25) {
             if (chordConfidenceBadge) chordConfidenceBadge.textContent = `${res.confidence}% Conf`;
         }
@@ -701,6 +705,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         tablature.setBPM(val);
         quantizer.setBPM(val);
         exporter.bpm = val;
+        if (backingTrackEngine) {
+            backingTrackEngine.setBpm(val);
+        }
     }
 
     if (bpmSlider) bpmSlider.addEventListener('input', (e) => updateBPM(e.target.value));
@@ -1515,6 +1522,161 @@ document.addEventListener('DOMContentLoaded', async () => {
             showToast(isSynthRoutedToFx ? 'Synthesizer & demo riffs routed through FX Rack.' : 'Synthesizer routed direct to output.');
         });
     }
+
+    // =========================================================================
+    // Smart Backing Track & Rhythm Accompaniment (Procedural Rhythm Trio)
+    // =========================================================================
+    let backingTrackEngine = null;
+
+    async function ensureBackingTrack() {
+        if (backingTrackEngine) return backingTrackEngine;
+        if (typeof BackingTrack === 'undefined') return null;
+
+        await synth.initAudioContext();
+        const audioCtx = synth.audioCtx || (dsp.audioCtx ? dsp.audioCtx : new (window.AudioContext || window.webkitAudioContext)());
+
+        backingTrackEngine = new BackingTrack.BackingTrackEngine({
+            audioCtx: audioCtx,
+            bpm: tablature.bpm || 120,
+            preset: backingProgressionSelect ? backingProgressionSelect.value : 'realtime',
+            style: backingGrooveSelect ? backingGrooveSelect.value : 'rock_straight_8ths'
+        });
+
+        // Wire event callbacks to UI badges
+        const backingLed = document.getElementById('backingTrackLed');
+        const backingChordText = document.getElementById('backingChordText');
+        const backingBeatText = document.getElementById('backingBeatText');
+
+        backingTrackEngine.on('step', (data) => {
+            if (backingChordText) backingChordText.textContent = data.chord;
+            if (backingBeatText) backingBeatText.textContent = `Bar ${data.bar + 1} : Beat ${data.beatNumber}`;
+            if (backingLed && data.isBeat) {
+                backingLed.classList.add('active');
+                setTimeout(() => backingLed.classList.remove('active'), 80);
+            }
+        });
+
+        backingTrackEngine.on('bar', (data) => {
+            if (backingChordText) backingChordText.textContent = data.chord;
+            if (backingBeatText) backingBeatText.textContent = `Bar ${data.bar + 1} : Beat 1`;
+        });
+
+        return backingTrackEngine;
+    }
+
+    const btnBackingStomp = document.getElementById('btnBackingStomp');
+    const backingBypassStatus = document.getElementById('backingBypassStatus');
+    const backingTrackLed = document.getElementById('backingTrackLed');
+    const backingProgressionSelect = document.getElementById('backingProgressionSelect');
+    const backingGrooveSelect = document.getElementById('backingGrooveSelect');
+    const backingDrumsSlider = document.getElementById('backingDrumsSlider');
+    const backingBassSlider = document.getElementById('backingBassSlider');
+    const backingKeysSlider = document.getElementById('backingKeysSlider');
+    const btnMuteDrums = document.getElementById('btnMuteDrums');
+    const btnMuteBass = document.getElementById('btnMuteBass');
+    const btnMuteKeys = document.getElementById('btnMuteKeys');
+
+    if (btnBackingStomp) {
+        btnBackingStomp.addEventListener('click', async () => {
+            const engine = await ensureBackingTrack();
+            if (!engine) return;
+
+            if (engine.isPlaying) {
+                engine.stop();
+                if (backingBypassStatus) backingBypassStatus.textContent = 'STANDBY';
+                if (backingTrackLed) backingTrackLed.classList.remove('active');
+                showToast('Accompaniment stopped.');
+            } else {
+                engine.setBpm(tablature.bpm || 120);
+                engine.start();
+                if (backingBypassStatus) backingBypassStatus.textContent = 'ACCOMPANYING';
+                showToast(`Accompaniment engaged: ${engine.preset.name} (${engine.grooveStyle.name})`);
+            }
+        });
+    }
+
+    if (backingProgressionSelect) {
+        backingProgressionSelect.addEventListener('change', async (e) => {
+            const engine = await ensureBackingTrack();
+            if (engine) {
+                engine.setProgression(e.target.value);
+                if (backingGrooveSelect && engine.preset.style) {
+                    backingGrooveSelect.value = engine.preset.style;
+                }
+                showToast(`Progression: ${engine.preset.name}`);
+            }
+        });
+    }
+
+    if (backingGrooveSelect) {
+        backingGrooveSelect.addEventListener('change', async (e) => {
+            const engine = await ensureBackingTrack();
+            if (engine) {
+                engine.setGroove(e.target.value);
+                showToast(`Groove style: ${engine.grooveStyle.name}`);
+            }
+        });
+    }
+
+    if (backingDrumsSlider) {
+        backingDrumsSlider.addEventListener('input', async (e) => {
+            const engine = await ensureBackingTrack();
+            if (engine) engine.setVolume('drums', parseFloat(e.target.value) / 100);
+        });
+    }
+
+    if (backingBassSlider) {
+        backingBassSlider.addEventListener('input', async (e) => {
+            const engine = await ensureBackingTrack();
+            if (engine) engine.setVolume('bass', parseFloat(e.target.value) / 100);
+        });
+    }
+
+    if (backingKeysSlider) {
+        backingKeysSlider.addEventListener('input', async (e) => {
+            const engine = await ensureBackingTrack();
+            if (engine) engine.setVolume('keys', parseFloat(e.target.value) / 100);
+        });
+    }
+
+    let isDrumsMuted = false;
+    if (btnMuteDrums) {
+        btnMuteDrums.addEventListener('click', async () => {
+            const engine = await ensureBackingTrack();
+            isDrumsMuted = !isDrumsMuted;
+            if (engine) engine.setMute('drums', isDrumsMuted);
+            btnMuteDrums.classList.toggle('active', isDrumsMuted);
+        });
+    }
+
+    let isBassMuted = false;
+    if (btnMuteBass) {
+        btnMuteBass.addEventListener('click', async () => {
+            const engine = await ensureBackingTrack();
+            isBassMuted = !isBassMuted;
+            if (engine) engine.setMute('bass', isBassMuted);
+            btnMuteBass.classList.toggle('active', isBassMuted);
+        });
+    }
+
+    let isKeysMuted = false;
+    if (btnMuteKeys) {
+        btnMuteKeys.addEventListener('click', async () => {
+            const engine = await ensureBackingTrack();
+            isKeysMuted = !isKeysMuted;
+            if (engine) engine.setMute('keys', isKeysMuted);
+            btnMuteKeys.classList.toggle('active', isKeysMuted);
+        });
+    }
+
+    // Also support keyboard shortcut 'B' for Backing Track toggle
+    window.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+        if (e.key.toLowerCase() === 'b') {
+            e.preventDefault();
+            if (btnBackingStomp) btnBackingStomp.click();
+        }
+    });
 
     // =========================================================================
     // Keyboard Hotkeys

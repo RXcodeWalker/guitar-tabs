@@ -735,6 +735,77 @@
                         </div>
                     </div>
 
+                    <!-- 3.5. Smart Backing Track & Rhythm Accompaniment Pedal -->
+                    <div class="stompbox-pedal pedal-backingtrack" id="pedalBackingTrack">
+                        <div class="pedal-top-row">
+                            <div class="pedal-branding">
+                                <span class="pedal-name">Rhythm Trio</span>
+                                <span class="pedal-subtitle">Procedural Accompaniment DSP</span>
+                            </div>
+                            <div id="backingTrackLed" class="pedal-jewel-led" title="Accompaniment Beat Indicator LED"></div>
+                        </div>
+
+                        <div class="pedal-controls">
+                            <!-- Real-Time Chord & Beat Status Display -->
+                            <div class="backing-readout">
+                                <span id="backingChordText">Am7</span>
+                                <span id="backingBeatText" style="color: #f43f5e; font-size: 10px;">Bar 1 : Beat 1</span>
+                            </div>
+
+                            <!-- Progression Preset Select -->
+                            <div class="pedal-knob-group">
+                                <div class="pedal-knob-header">
+                                    <span>Progression</span>
+                                </div>
+                                <select id="backingProgressionSelect" class="pedal-select" title="Accompaniment Progression Preset">
+                                    <option value="12_bar_blues_e">12-Bar Blues in E</option>
+                                    <option value="12_bar_blues_a">12-Bar Blues in A</option>
+                                    <option value="pop_i_v_vi_iv_c">Pop I-V-vi-IV in C</option>
+                                    <option value="pop_i_v_vi_iv_g">Pop I-V-vi-IV in G</option>
+                                    <option value="jazz_ii_v_i_c">Jazz ii-V-I in C</option>
+                                    <option value="jazz_ii_v_i_g">Jazz ii-V-I in G</option>
+                                    <option value="realtime" selected>🎸 Follow Live Guitar Chords</option>
+                                </select>
+                            </div>
+
+                            <!-- Groove Style Select -->
+                            <div class="pedal-knob-group">
+                                <div class="pedal-knob-header">
+                                    <span>Groove Style</span>
+                                </div>
+                                <select id="backingGrooveSelect" class="pedal-select" title="Procedural Groove Style">
+                                    <option value="rock_straight_8ths" selected>Rock Straight 8ths</option>
+                                    <option value="blues_shuffle">Blues Shuffle (swung)</option>
+                                    <option value="funk_16ths">Funk 16ths</option>
+                                    <option value="jazz_walking">Jazz Walking 4/4</option>
+                                </select>
+                            </div>
+
+                            <!-- Mixer Levels & Mute Toggles -->
+                            <div class="pedal-knob-group">
+                                <div class="pedal-knob-header">
+                                    <span>Drums / Bass / Keys</span>
+                                    <div class="backing-mute-group">
+                                        <button id="btnMuteDrums" class="backing-mute-btn" title="Toggle Drums Mute">D</button>
+                                        <button id="btnMuteBass" class="backing-mute-btn" title="Toggle Bass Mute">B</button>
+                                        <button id="btnMuteKeys" class="backing-mute-btn" title="Toggle Keys Mute">K</button>
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 8px;">
+                                    <input type="range" id="backingDrumsSlider" class="pedal-slider" min="0" max="100" value="85" title="Drums Volume">
+                                    <input type="range" id="backingBassSlider" class="pedal-slider" min="0" max="100" value="80" title="Bass Volume">
+                                    <input type="range" id="backingKeysSlider" class="pedal-slider" min="0" max="100" value="75" title="Keys Volume">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Stompbox Footswitch Bay -->
+                        <div class="pedal-footswitch-bay">
+                            <button id="btnBackingStomp" class="pedal-footswitch" title="Engage / Stop Procedural Accompaniment"></button>
+                            <span id="backingBypassStatus" class="pedal-switch-status">STANDBY</span>
+                        </div>
+                    </div>
+
                     <!-- 4. Master Control & Routing Bay -->
                     <div class="stompbox-pedal pedal-master" id="pedalMaster">
                         <div class="pedal-top-row">
@@ -843,6 +914,9 @@
                 <div class="guide-key-item">
                     <kbd>R</kbd> <span>Rewind</span>
                 </div>
+                <div class="guide-key-item">
+                    <kbd>B</kbd> <span>Accompaniment</span>
+                </div>
             </div>
             <div>
                 <span>FretDSP Studio • Real-Time Web Audio DSP & Karplus-Strong Physical String Synthesis</span>
@@ -945,6 +1019,7 @@
     <script src="js/spectral-visualizer.js"></script>
     <script src="js/demo-songs.js"></script>
     <script src="js/chord-engine.js"></script>
+    <script src="js/backing-track.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

@@ -1498,6 +1498,62 @@ kbd {
     box-shadow: 0 0 16px var(--led-cyan), inset 0 1px 2px #ffffff;
 }
 
+/* 5. Smart Backing Track: Vintage Crimson / Deep Ruby Velvet Enclosure */
+.pedal-backingtrack {
+    background: linear-gradient(180deg, #4c0519 0%, #881337 25%, #3b0717 85%, #1f040c 100%);
+    border: 2px solid #f43f5e;
+}
+.pedal-backingtrack .pedal-name {
+    color: #ffe4e6;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+.pedal-backingtrack .pedal-jewel-led.active {
+    background: #f43f5e;
+    box-shadow: 0 0 16px #f43f5e, inset 0 1px 2px #ffffff;
+}
+.pedal-backingtrack .pedal-slider {
+    accent-color: #f43f5e;
+}
+.backing-readout {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(244, 63, 94, 0.4);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    color: #fda4af;
+    margin-bottom: 6px;
+    width: 100%;
+    justify-content: space-between;
+}
+.backing-mute-group {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+.backing-mute-btn {
+    padding: 2px 6px;
+    font-size: 9px;
+    font-family: var(--font-mono);
+    border-radius: 4px;
+    background: #27272a;
+    border: 1px solid #3f3f46;
+    color: #a1a1aa;
+    cursor: pointer;
+    font-weight: 700;
+    transition: all 0.15s ease;
+}
+.backing-mute-btn.active {
+    background: #e11d48;
+    color: #ffffff;
+    border-color: #f43f5e;
+    box-shadow: 0 0 6px rgba(244, 63, 94, 0.5);
+}
+
 /* Stompbox Top Badge & Pilot Light */
 .pedal-top-row {
     display: flex;
