@@ -71,6 +71,12 @@
                     <span class="jewel-led" style="width: 8px; height: 8px;"></span> Standby
                 </span>
             </div>
+
+            <!-- Interactive Guided Tour Button -->
+            <button id="btnStartTour" class="tour-launch-btn" title="Take a plain-English guided tour of every feature">
+                <span class="tour-launch-icon">🎓</span>
+                <span>Take a Tour</span>
+            </button>
         </header>
 
         <!-- 2. MASTER CONTROL BAR: Stomp Switch, BPM Slider, Quantize, Pedal Tuner -->
@@ -159,7 +165,7 @@
         <!-- 3. MAIN STAGE: Upper Fretboard, Middle Tablature, Lower FFT Heatmap -->
         <main class="main-stage">
             <!-- 3.1 Upper Section: Full 22-Fret Interactive Illuminated Fretboard -->
-            <section class="chassis-panel stage-card">
+            <section id="sectionFretboard" class="chassis-panel stage-card">
                 <div class="screw screw-tl"></div>
                 <div class="screw screw-tr"></div>
                 <div class="screw screw-bl"></div>
@@ -266,7 +272,7 @@
             </section>
 
             <!-- 3.2 Middle Section: Auto-Scrolling Tablature Staff with Transport Controls -->
-            <section class="chassis-panel stage-card">
+            <section id="sectionTablature" class="chassis-panel stage-card">
                 <div class="screw screw-tl"></div>
                 <div class="screw screw-tr"></div>
                 <div class="screw screw-bl"></div>
@@ -360,7 +366,7 @@
             </section>
 
             <!-- 3.3 Lower Section: Real-Time FFT Spectral Heat-Map & Harmonic Overtones -->
-            <section class="chassis-panel stage-card">
+            <section id="sectionSpectral" class="chassis-panel stage-card">
                 <div class="screw screw-tl"></div>
                 <div class="screw screw-tr"></div>
                 <div class="screw screw-bl"></div>
@@ -384,7 +390,7 @@
             </section>
 
             <!-- 3.4 High-Precision Virtual Strobe Tuner & Acoustic Inharmonicity Analyzer -->
-            <section class="chassis-panel stage-card strobe-analyzer-panel">
+            <section id="sectionStrobe" class="chassis-panel stage-card strobe-analyzer-panel">
                 <div class="screw screw-tl"></div>
                 <div class="screw screw-tr"></div>
                 <div class="screw screw-bl"></div>
@@ -516,7 +522,7 @@
             </section>
 
             <!-- 3.4 Guitar Effects Rack (Stompbox Chain & Split Routing) -->
-            <section class="chassis-panel effects-rack-chassis">
+            <section id="sectionEffectsRack" class="chassis-panel effects-rack-chassis">
                 <div class="screw screw-tl"></div>
                 <div class="screw screw-tr"></div>
                 <div class="screw screw-bl"></div>
@@ -850,7 +856,7 @@
         </main>
 
         <!-- 4. ACTION TRAY: Export ASCII Tab, Download MIDI, Copy Link, Demo Riffs -->
-        <section class="chassis-panel action-tray">
+        <section id="sectionActionTray" class="chassis-panel action-tray">
             <div class="screw screw-tl"></div>
             <div class="screw screw-tr"></div>
             <div class="screw screw-bl"></div>
@@ -889,7 +895,7 @@
         </section>
 
         <!-- 5. Keyboard Shortcut Guide & Tips -->
-        <footer class="keyboard-guide-bar">
+        <footer id="sectionKeyboardGuide" class="keyboard-guide-bar">
             <div class="guide-keys-list">
                 <div class="guide-key-item">
                     <span style="font-weight: 700; color: var(--text-muted);">Virtual Plucks:</span>
@@ -1022,5 +1028,6 @@
     <script src="js/backing-track.js"></script>
     <script src="js/midi-output.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/tutorial.js"></script>
 </body>
 </html>

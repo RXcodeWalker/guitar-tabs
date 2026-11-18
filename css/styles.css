@@ -2138,3 +2138,554 @@ kbd {
     background: #ef4444;
     box-shadow: 0 0 4px #ef4444;
 }
+
+
+/* ==========================================================================
+   INTERACTIVE GUIDED TOUR & FEATURE TUTORIAL
+   ========================================================================== */
+
+.tour-launch-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 16px;
+    border-radius: var(--radius-md);
+    background: linear-gradient(180deg, rgba(0, 243, 255, 0.16) 0%, rgba(0, 243, 255, 0.06) 100%);
+    border: 1px solid rgba(0, 243, 255, 0.45);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    cursor: pointer;
+    box-shadow: 0 2px 12px rgba(0, 243, 255, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    transition: all 0.18s ease;
+    white-space: nowrap;
+}
+
+.tour-launch-btn:hover {
+    background: linear-gradient(180deg, rgba(0, 243, 255, 0.26) 0%, rgba(0, 243, 255, 0.12) 100%);
+    border-color: var(--led-cyan);
+    color: #ffffff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 18px rgba(0, 243, 255, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.tour-launch-btn:active {
+    transform: translateY(0);
+}
+
+.tour-launch-icon {
+    font-size: 15px;
+    line-height: 1;
+}
+
+/* Full-screen dim backdrop for centered Welcome step */
+.tour-backdrop-full {
+    position: fixed;
+    inset: 0;
+    background: rgba(5, 6, 10, 0.78);
+    backdrop-filter: blur(4px);
+    z-index: 9990;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+}
+
+.tour-backdrop-full.open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Live Spotlight Cutout Ring (target stays clickable underneath!) */
+.tour-spotlight {
+    position: fixed;
+    z-index: 9990;
+    border-radius: 14px;
+    border: 2px solid var(--led-cyan);
+    box-shadow:
+        0 0 0 9999px rgba(5, 6, 10, 0.76),
+        0 0 26px rgba(0, 243, 255, 0.42),
+        inset 0 0 18px rgba(0, 243, 255, 0.12);
+    pointer-events: none;
+    opacity: 0;
+    transition: top 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+                left 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+                width 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+                height 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+                opacity 0.22s ease;
+}
+
+.tour-spotlight.open {
+    opacity: 1;
+}
+
+/* Floating Tour Popover Card */
+.tour-card {
+    position: fixed;
+    z-index: 9995;
+    width: 480px;
+    max-width: calc(100vw - 24px);
+    max-height: calc(100vh - 32px);
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(180deg, #1d1e26 0%, #13141a 100%);
+    border: 1px solid rgba(0, 243, 255, 0.38);
+    border-radius: 14px;
+    box-shadow:
+        0 24px 60px rgba(0, 0, 0, 0.85),
+        0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+        0 0 32px rgba(0, 243, 255, 0.14);
+    color: var(--text-primary);
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+    pointer-events: none;
+    transition: opacity 0.22s ease, transform 0.24s cubic-bezier(0.22, 1, 0.36, 1), top 0.26s ease, left 0.26s ease;
+}
+
+.tour-card.open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+.tour-card.tour-card-centered {
+    top: 50%;
+    left: 50%;
+    width: 520px;
+    transform: translate(-50%, -48%) scale(0.98);
+}
+
+.tour-card.tour-card-centered.open {
+    transform: translate(-50%, -50%) scale(1);
+}
+
+/* Top Progress Bar */
+.tour-progress-track {
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
+}
+
+.tour-progress-fill {
+    height: 100%;
+    width: 8%;
+    background: linear-gradient(90deg, var(--led-cyan), #10b981);
+    box-shadow: 0 0 10px var(--led-cyan-glow);
+    transition: width 0.28s ease;
+}
+
+/* Card Header Bar */
+.tour-card-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px 16px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    background: rgba(0, 0, 0, 0.2);
+    flex-shrink: 0;
+}
+
+.tour-meta-left,
+.tour-meta-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tour-category-pill {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--led-cyan);
+    background: rgba(0, 243, 255, 0.12);
+    border: 1px solid rgba(0, 243, 255, 0.32);
+    padding: 3px 8px;
+    border-radius: 4px;
+}
+
+.tour-step-counter {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.tour-topics-btn {
+    background: #22232d;
+    border: 1px solid #353746;
+    color: var(--text-secondary);
+    font-family: var(--font-sans);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.tour-topics-btn:hover,
+.tour-topics-btn.active {
+    color: var(--led-cyan);
+    border-color: rgba(0, 243, 255, 0.5);
+    background: rgba(0, 243, 255, 0.1);
+}
+
+.tour-close-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-muted);
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+}
+
+.tour-close-btn:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Collapsible Topics Jump Menu */
+.tour-topics-menu {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    padding: 12px 16px;
+    background: #0f1016;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    max-height: 220px;
+    overflow-y: auto;
+    flex-shrink: 0;
+}
+
+.tour-topics-menu[hidden] {
+    display: none;
+}
+
+.tour-topic-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 9px;
+    border-radius: 7px;
+    background: #181a22;
+    border: 1px solid #272936;
+    color: var(--text-secondary);
+    font-family: var(--font-sans);
+    font-size: 11.5px;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.14s ease;
+}
+
+.tour-topic-item:hover {
+    border-color: rgba(0, 243, 255, 0.45);
+    color: var(--text-primary);
+    background: #202330;
+}
+
+.tour-topic-item.active {
+    border-color: var(--led-cyan);
+    color: #ffffff;
+    background: rgba(0, 243, 255, 0.14);
+}
+
+.tour-topic-num {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--led-cyan);
+    min-width: 16px;
+}
+
+.tour-topic-icon {
+    font-size: 13px;
+}
+
+.tour-topic-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Card Body */
+.tour-card-body {
+    padding: 16px 18px 14px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.tour-heading-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.tour-step-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    background: rgba(0, 243, 255, 0.1);
+    border: 1px solid rgba(0, 243, 255, 0.25);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.tour-step-title {
+    font-size: 16.5px;
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1.28;
+    letter-spacing: -0.2px;
+}
+
+.tour-step-summary {
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: #d4d7e0;
+}
+
+.tour-points-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+}
+
+.tour-points-list li {
+    position: relative;
+    padding: 8px 11px 8px 24px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: #c2c7d4;
+}
+
+.tour-points-list li::before {
+    content: '▸';
+    position: absolute;
+    left: 10px;
+    top: 8px;
+    color: var(--led-cyan);
+    font-weight: 700;
+}
+
+.tour-point-label {
+    color: #ffffff;
+    font-weight: 700;
+}
+
+/* Interactive "Try It" Action Buttons */
+.tour-actions-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 2px;
+}
+
+.tour-actions-row[hidden] {
+    display: none;
+}
+
+.tour-try-btn {
+    flex: 1;
+    min-width: 160px;
+    padding: 9px 14px;
+    border-radius: 8px;
+    font-family: var(--font-sans);
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.16s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.tour-try-primary {
+    background: rgba(16, 185, 129, 0.16);
+    border: 1px solid rgba(16, 185, 129, 0.55);
+    color: #6ee7b7;
+}
+
+.tour-try-primary:hover:not(:disabled) {
+    background: rgba(16, 185, 129, 0.28);
+    border-color: #10b981;
+    color: #ffffff;
+    box-shadow: 0 0 14px rgba(16, 185, 129, 0.3);
+}
+
+.tour-try-secondary {
+    background: rgba(0, 243, 255, 0.1);
+    border: 1px solid rgba(0, 243, 255, 0.4);
+    color: var(--led-cyan);
+}
+
+.tour-try-secondary:hover:not(:disabled) {
+    background: rgba(0, 243, 255, 0.22);
+    border-color: var(--led-cyan);
+    color: #ffffff;
+}
+
+.tour-try-btn:disabled {
+    opacity: 0.7;
+    cursor: wait;
+}
+
+/* Tip Callout */
+.tour-tip-box {
+    padding: 9px 12px;
+    border-radius: 8px;
+    background: rgba(255, 176, 32, 0.1);
+    border: 1px solid rgba(255, 176, 32, 0.32);
+    color: #fde68a;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.tour-tip-box[hidden] {
+    display: none;
+}
+
+/* Card Footer & Navigation */
+.tour-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.26);
+    flex-shrink: 0;
+}
+
+.tour-dots-wrap {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.tour-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.2);
+    cursor: pointer;
+    padding: 0;
+    transition: all 0.18s ease;
+}
+
+.tour-dot:hover {
+    background: rgba(255, 255, 255, 0.55);
+    transform: scale(1.25);
+}
+
+.tour-dot.completed {
+    background: rgba(16, 185, 129, 0.65);
+}
+
+.tour-dot.active {
+    width: 18px;
+    border-radius: 99px;
+    background: var(--led-cyan);
+    box-shadow: 0 0 8px var(--led-cyan-glow);
+}
+
+.tour-nav-buttons {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.tour-btn {
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-family: var(--font-sans);
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.tour-btn-ghost {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-muted);
+    padding: 8px 10px;
+}
+
+.tour-btn-ghost:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.tour-btn-secondary {
+    background: #232530;
+    border: 1px solid #383b4c;
+    color: var(--text-primary);
+}
+
+.tour-btn-secondary:hover {
+    background: #2d3040;
+    border-color: #50546b;
+}
+
+.tour-btn-primary {
+    background: linear-gradient(180deg, #00e5f2 0%, #00b8cc 100%);
+    border: 1px solid #5ef8ff;
+    color: #061318;
+    box-shadow: 0 2px 12px rgba(0, 243, 255, 0.32);
+}
+
+.tour-btn-primary:hover {
+    background: linear-gradient(180deg, #2ef5ff 0%, #00cce0 100%);
+    box-shadow: 0 4px 16px rgba(0, 243, 255, 0.48);
+    transform: translateY(-1px);
+}
+
+@media (max-width: 600px) {
+    .tour-topics-menu {
+        grid-template-columns: 1fr;
+    }
+    .tour-card-footer {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .tour-dots-wrap {
+        justify-content: center;
+    }
+    .tour-nav-buttons {
+        justify-content: flex-end;
+    }
+}
