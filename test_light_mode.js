@@ -51,13 +51,37 @@ const requiredCssSelectors = [
     'body.light-theme .effects-rack-chassis',
     'body.light-theme .chord-scale-ribbon',
     'body.light-theme .modal-content',
-    'body.light-theme .tour-card'
+    'body.light-theme .tour-card',
+    'body.light-theme .tour-mission-box',
+    'body.light-theme .tour-mission-badge',
+    'body.light-theme .tour-mission-prompt',
+    'body.light-theme .tour-task-item',
+    'body.light-theme .tour-task-check',
+    'body.light-theme .tour-tip-box',
+    'body.light-theme .tour-try-primary',
+    'body.light-theme .tour-try-secondary',
+    'body.light-theme .tour-score-pill',
+    'body.light-theme .tour-topics-btn',
+    'body.light-theme .tour-close-btn',
+    'body.light-theme .scale-recommendation-pill',
+    'body.light-theme .wear-fresh',
+    'body.light-theme .wear-worn'
 ];
 
 for (const sel of requiredCssSelectors) {
     assert(css.includes(sel), `Missing required CSS selector: ${sel}`);
     console.log(`  ✓ ${sel} selector defined`);
 }
+
+// Verify high-contrast color choices in Light Mode (WCAG accessibility)
+assert(css.includes('body.light-theme .tour-mission-prompt') && css.includes('#0f172a'), 'Light mode mission prompt must have high-contrast dark text');
+console.log('  ✓ Light mode mission prompt uses high-contrast dark slate text (#0f172a)');
+
+assert(css.includes('body.light-theme .tour-tip-box') && css.includes('#92400e'), 'Light mode tip box must use dark amber text (#92400e) on light background');
+console.log('  ✓ Light mode tip box uses high-contrast dark amber text (#92400e)');
+
+assert(css.includes('body.light-theme .tour-try-primary') && css.includes('#065f46'), 'Light mode try button must use dark forest green text (#065f46)');
+console.log('  ✓ Light mode try button uses high-contrast dark forest emerald text (#065f46)');
 
 // 3. Verify Tablature Theme API
 console.log('\n--- Section 3: TablatureStaff setTheme() Dynamic Canvas Palette ---');

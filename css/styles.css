@@ -3789,7 +3789,8 @@ body.light-theme .tour-btn-ghost:hover,
 body.light-theme .tour-mode-card,
 [data-theme="light"] .tour-mode-card {
     background: #f8fafc;
-    border-color: #e2e8f0;
+    border-color: #cbd5e1;
+    color: #475569;
 }
 
 body.light-theme .tour-mode-card strong,
@@ -3800,7 +3801,15 @@ body.light-theme .tour-mode-card strong,
 body.light-theme .tour-mode-card:hover,
 [data-theme="light"] .tour-mode-card:hover {
     background: #f1f5f9;
-    border-color: #cbd5e1;
+    border-color: #0284c7;
+    color: #0f172a;
+}
+
+body.light-theme .tour-mode-card.active,
+[data-theme="light"] .tour-mode-card.active {
+    background: #e0f2fe;
+    border-color: #0284c7;
+    color: #0369a1;
 }
 
 body.light-theme .tour-jam-key,
@@ -3810,9 +3819,332 @@ body.light-theme .tour-jam-key,
     color: #0f172a;
 }
 
+body.light-theme .tour-jam-key kbd,
+[data-theme="light"] .tour-jam-key kbd {
+    color: #0284c7;
+}
+
+body.light-theme .tour-jam-key span,
+[data-theme="light"] .tour-jam-key span {
+    color: #64748b;
+}
+
 body.light-theme .tour-jam-key:hover,
 [data-theme="light"] .tour-jam-key:hover {
     background: #e0f2fe;
     border-color: #0284c7;
 }
+
+body.light-theme .tour-jam-key.pressed,
+body.light-theme .tour-jam-key:active,
+[data-theme="light"] .tour-jam-key.pressed,
+[data-theme="light"] .tour-jam-key:active {
+    background: #0284c7;
+    border-color: #0369a1;
+    box-shadow: 0 0 14px rgba(2, 132, 199, 0.45);
+}
+
+body.light-theme .tour-jam-key.pressed kbd,
+body.light-theme .tour-jam-key:active kbd,
+body.light-theme .tour-jam-key.pressed span,
+body.light-theme .tour-jam-key:active span,
+[data-theme="light"] .tour-jam-key.pressed kbd,
+[data-theme="light"] .tour-jam-key:active kbd,
+[data-theme="light"] .tour-jam-key.pressed span,
+[data-theme="light"] .tour-jam-key:active span {
+    color: #ffffff;
+}
+
+body.light-theme .tour-finale-summary,
+[data-theme="light"] .tour-finale-summary {
+    background: #e0f2fe;
+    border: 1px solid #7dd3fc;
+    color: #0369a1;
+}
+
+/* Tour Header Badges & Navigation Buttons in Light Mode */
+body.light-theme .tour-category-pill,
+[data-theme="light"] .tour-category-pill {
+    background: #e0f2fe;
+    border: 1px solid #7dd3fc;
+    color: #0369a1;
+    font-weight: 800;
+}
+
+body.light-theme .tour-step-counter,
+[data-theme="light"] .tour-step-counter {
+    color: #475569;
+    font-weight: 700;
+}
+
+body.light-theme .tour-score-pill,
+[data-theme="light"] .tour-score-pill {
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    color: #475569;
+}
+
+body.light-theme .tour-score-pill.has-score,
+[data-theme="light"] .tour-score-pill.has-score {
+    background: #fef3c7;
+    border-color: #fcd34d;
+    color: #92400e;
+}
+
+body.light-theme .tour-topics-btn,
+[data-theme="light"] .tour-topics-btn {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    color: #334155;
+}
+
+body.light-theme .tour-topics-btn:hover,
+body.light-theme .tour-topics-btn.active,
+[data-theme="light"] .tour-topics-btn:hover,
+[data-theme="light"] .tour-topics-btn.active {
+    background: #e0f2fe;
+    border-color: #0284c7;
+    color: #0369a1;
+}
+
+body.light-theme .tour-close-btn,
+[data-theme="light"] .tour-close-btn {
+    color: #64748b;
+}
+
+body.light-theme .tour-close-btn:hover,
+[data-theme="light"] .tour-close-btn:hover {
+    color: #0f172a;
+    background: #e2e8f0;
+    border-color: #cbd5e1;
+}
+
+body.light-theme .tour-step-icon,
+[data-theme="light"] .tour-step-icon {
+    background: #e0f2fe;
+    border: 1px solid #bae6fd;
+    color: #0369a1;
+}
+
+body.light-theme .tour-topic-num,
+[data-theme="light"] .tour-topic-num {
+    color: #0284c7;
+}
+
+body.light-theme .tour-topic-check,
+[data-theme="light"] .tour-topic-check {
+    color: #16a34a;
+}
+
+/* Hands-On Mission Box ("YOUR TURN") in Light Mode - High Contrast UX */
+body.light-theme .tour-mission-box,
+[data-theme="light"] .tour-mission-box {
+    background: linear-gradient(180deg, #fffdf5 0%, #fffbeb 100%);
+    border: 1.5px solid #fde68a;
+    box-shadow: 0 2px 10px rgba(217, 119, 6, 0.08);
+}
+
+body.light-theme .tour-mission-box.mission-completed,
+[data-theme="light"] .tour-mission-box.mission-completed {
+    background: linear-gradient(180deg, #f0fdf4 0%, #ecfdf5 100%);
+    border-color: #86efac;
+    box-shadow: 0 0 16px rgba(16, 185, 129, 0.14);
+}
+
+body.light-theme .tour-mission-badge,
+[data-theme="light"] .tour-mission-badge {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fcd34d;
+    font-weight: 800;
+}
+
+body.light-theme .tour-mission-box.mission-completed .tour-mission-badge,
+[data-theme="light"] .tour-mission-box.mission-completed .tour-mission-badge {
+    background: #dcfce7;
+    color: #166534;
+    border-color: #86efac;
+}
+
+body.light-theme .tour-mission-prompt,
+[data-theme="light"] .tour-mission-prompt {
+    color: #0f172a;
+    font-weight: 700;
+}
+
+body.light-theme .tour-task-item,
+[data-theme="light"] .tour-task-item {
+    color: #334155;
+    font-weight: 500;
+}
+
+body.light-theme .tour-task-check,
+[data-theme="light"] .tour-task-check {
+    color: #92400e;
+    background: #fef3c7;
+    border: 1.5px solid #f59e0b;
+}
+
+body.light-theme .tour-task-item.done .tour-task-check,
+[data-theme="light"] .tour-task-item.done .tour-task-check {
+    color: #ffffff;
+    background: #16a34a;
+    border-color: #16a34a;
+}
+
+body.light-theme .tour-task-item.done .tour-task-text,
+[data-theme="light"] .tour-task-item.done .tour-task-text {
+    color: #64748b;
+    text-decoration: line-through;
+    opacity: 0.85;
+}
+
+body.light-theme .tour-task-count,
+[data-theme="light"] .tour-task-count {
+    color: #0284c7;
+    font-weight: 800;
+}
+
+body.light-theme .tour-mission-feedback,
+[data-theme="light"] .tour-mission-feedback {
+    color: #15803d;
+    font-weight: 700;
+}
+
+/* Tip Callout Box in Light Mode - High Contrast Warm Amber */
+body.light-theme .tour-tip-box,
+[data-theme="light"] .tour-tip-box {
+    background: #fffbeb;
+    border: 1.5px solid #fde68a;
+    color: #92400e;
+    font-weight: 500;
+}
+
+/* Interactive Action "Try It" Buttons in Light Mode - High Contrast UI */
+body.light-theme .tour-try-primary,
+[data-theme="light"] .tour-try-primary {
+    background: #ecfdf5;
+    border: 1.5px solid #10b981;
+    color: #065f46;
+    font-weight: 700;
+    box-shadow: 0 1px 3px rgba(16, 185, 129, 0.1);
+}
+
+body.light-theme .tour-try-primary:hover:not(:disabled),
+[data-theme="light"] .tour-try-primary:hover:not(:disabled) {
+    background: #d1fae5;
+    border-color: #059669;
+    color: #064e3b;
+    box-shadow: 0 2px 10px rgba(16, 185, 129, 0.22);
+}
+
+body.light-theme .tour-try-secondary,
+[data-theme="light"] .tour-try-secondary {
+    background: #f0f9ff;
+    border: 1.5px solid #0284c7;
+    color: #0369a1;
+    font-weight: 700;
+    box-shadow: 0 1px 3px rgba(2, 132, 199, 0.1);
+}
+
+body.light-theme .tour-try-secondary:hover:not(:disabled),
+[data-theme="light"] .tour-try-secondary:hover:not(:disabled) {
+    background: #e0f2fe;
+    border-color: #0284c7;
+    color: #075985;
+    box-shadow: 0 2px 10px rgba(2, 132, 199, 0.22);
+}
+
+/* Scale Recommendation Badge in Light Mode */
+body.light-theme .scale-recommendation-pill,
+[data-theme="light"] .scale-recommendation-pill {
+    background: #fef3c7;
+    border: 1px solid #fcd34d;
+    color: #92400e;
+    font-weight: 700;
+}
+
+/* Strobe Tuner Wear Badges in Light Mode */
+body.light-theme .wear-fresh,
+[data-theme="light"] .wear-fresh {
+    background: #dcfce7;
+    color: #166534;
+    border: 1px solid #86efac;
+    font-weight: 700;
+}
+
+body.light-theme .wear-good,
+[data-theme="light"] .wear-good {
+    background: #e0f2fe;
+    color: #0369a1;
+    border: 1px solid #7dd3fc;
+    font-weight: 700;
+}
+
+body.light-theme .wear-aged,
+[data-theme="light"] .wear-aged {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fcd34d;
+    font-weight: 700;
+}
+
+body.light-theme .wear-worn,
+[data-theme="light"] .wear-worn {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fca5a5;
+    font-weight: 700;
+}
+
+/* Inharmonicity Metrics Grid & Partials in Light Mode */
+body.light-theme .metric-box,
+[data-theme="light"] .metric-box {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+}
+
+body.light-theme .metric-label,
+[data-theme="light"] .metric-label {
+    color: #64748b;
+}
+
+body.light-theme .metric-val,
+[data-theme="light"] .metric-val {
+    color: #0f172a;
+}
+
+body.light-theme .peaks-table th,
+[data-theme="light"] .peaks-table th {
+    background: #f1f5f9;
+    color: #475569;
+    border-bottom-color: #cbd5e1;
+}
+
+body.light-theme .peaks-table td,
+[data-theme="light"] .peaks-table td {
+    border-bottom-color: #e2e8f0;
+    color: #334155;
+}
+
+body.light-theme .peaks-table tr:hover td,
+[data-theme="light"] .peaks-table tr:hover td {
+    background: #f8fafc;
+}
+
+body.light-theme .pluck-btn,
+[data-theme="light"] .pluck-btn {
+    background: #ffffff;
+    border-color: #cbd5e1;
+    color: #0f172a;
+}
+
+body.light-theme .pluck-btn:hover,
+[data-theme="light"] .pluck-btn:hover {
+    background: #f1f5f9;
+    border-color: #0284c7;
+    color: #0284c7;
+    box-shadow: 0 0 10px rgba(2, 132, 199, 0.15);
+}
+
 
