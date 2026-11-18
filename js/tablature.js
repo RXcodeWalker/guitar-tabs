@@ -124,8 +124,11 @@ class TablatureStaff {
         this.colors = {
             background: '#0a0a0d',
             gutterBg: '#141418',
+            gutterBorder: '#30363d',
+            gutterText: '#64748b',
             staffLine: '#262632',
             measureBar: '#5a5a6c',
+            measureText: '#cbd5e1',
             beatTick: '#1a1a24',
             playhead: '#00f3ff',
             playheadGlow: 'rgba(0, 243, 255, 0.5)',
@@ -881,6 +884,76 @@ class TablatureStaff {
         }
     }
 
+    /**
+     * Updates color palette for Clean Light Mode vs. Boutique Dark Mode.
+     * @param {'light'|'dark'} theme
+     */
+    setTheme(theme) {
+        this.theme = theme;
+        if (theme === 'light') {
+            this.colors = Object.assign(this.colors, {
+                background: '#ffffff',
+                gutterBg: '#f8fafc',
+                gutterBorder: '#cbd5e1',
+                gutterText: '#475569',
+                staffLine: '#cbd5e1',
+                measureBar: '#64748b',
+                measureText: '#475569',
+                beatTick: '#e2e8f0',
+                playhead: '#0284c7',
+                playheadGlow: 'rgba(2, 132, 199, 0.35)',
+                notePillBg: '#f1f5f9',
+                noteBorder: '#0284c7',
+                noteText: '#0f172a',
+                stringText: '#475569',
+                activePillBg: '#38bdf8',
+                loopShade: 'rgba(217, 119, 6, 0.08)',
+                loopBorder: '#d97706',
+                loopBorderGlow: 'rgba(217, 119, 6, 0.35)',
+                gradePerfect: '#059669',
+                gradePerfectGlow: 'rgba(5, 150, 105, 0.45)',
+                gradeSlight: '#d97706',
+                gradeSlightGlow: 'rgba(217, 119, 6, 0.45)',
+                gradeMiss: '#dc2626',
+                gradeMissGlow: 'rgba(220, 38, 38, 0.45)'
+            });
+        } else {
+            this.colors = Object.assign(this.colors, {
+                background: '#0a0a0d',
+                gutterBg: '#141418',
+                gutterBorder: '#30363d',
+                gutterText: '#64748b',
+                staffLine: '#262632',
+                measureBar: '#5a5a6c',
+                measureText: '#cbd5e1',
+                beatTick: '#1a1a24',
+                playhead: '#00f3ff',
+                playheadGlow: 'rgba(0, 243, 255, 0.5)',
+                notePillBg: '#1a1a22',
+                noteBorder: '#00f3ff',
+                noteText: '#ffffff',
+                stringText: '#9ca3af',
+                activePillBg: '#0284c7',
+                loopShade: 'rgba(255, 176, 32, 0.08)',
+                loopBorder: '#ffb020',
+                loopBorderGlow: 'rgba(255, 176, 32, 0.4)',
+                gradePerfect: '#10b981',
+                gradePerfectGlow: 'rgba(16, 185, 129, 0.6)',
+                gradeSlight: '#ffb020',
+                gradeSlightGlow: 'rgba(255, 176, 32, 0.6)',
+                gradeMiss: '#ef4444',
+                gradeMissGlow: 'rgba(239, 68, 68, 0.6)'
+            });
+        }
+        this.render();
+    }
+
+    render() {
+        if (typeof this.draw === 'function') {
+            this.draw();
+        }
+    }
+
     // =========================================================================
     // Canvas Drawing Methods
     // =========================================================================
@@ -1033,7 +1106,7 @@ class TablatureStaff {
 
                 // Measure number header button
                 const isLoopActive = this.isPracticeLoopEnabled() && measureNum >= this.loopStartBar && measureNum <= this.loopEndBar;
-                ctx.fillStyle = isLoopActive ? '#ffb020' : '#cbd5e1';
+                ctx.fillStyle = isLoopActive ? (this.colors.loopBorder || '#ffb020') : (this.colors.measureText || '#cbd5e1');
                 ctx.font = 'bold 11px monospace';
                 ctx.textAlign = 'center';
                 ctx.fillText(`M${measureNum}`, x, this.staffTop - 12);
@@ -1218,7 +1291,7 @@ class TablatureStaff {
         ctx.fillRect(0, 0, this.gutterWidth, this.cssHeight);
 
         // Divider line
-        ctx.strokeStyle = '#30363d';
+        ctx.strokeStyle = this.colors.gutterBorder || '#30363d';
         ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.moveTo(this.gutterWidth, 0);
@@ -1226,7 +1299,7 @@ class TablatureStaff {
         ctx.stroke();
 
         // "TAB" Clef Logo Header
-        ctx.fillStyle = '#64748b';
+        ctx.fillStyle = this.colors.gutterText || '#64748b';
         ctx.font = '900 13px "Inter", sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';

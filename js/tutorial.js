@@ -1,7 +1,7 @@
 /**
- * FretDSP Interactive Guided Tour & Plain-English Tutorial
- * Walks users step-by-step through every panel of the app in simple,
- * jargon-free language with live spotlight highlighting and "Try It" demos.
+ * FretDSP Interactive Hands-On Guided Tour
+ * Plain-English feature tour with live spotlighting, pulsing control beacons,
+ * real-time interactive mini-missions, audio previews, and progress tracking.
  */
 
 class FretDSPTutorial {
@@ -13,7 +13,20 @@ class FretDSPTutorial {
         this.rafId = null;
         this.demoPluckTimers = [];
 
+        // User preference chosen on Welcome screen: 'guitar' | 'mouse'
+        this.userMode = 'mouse';
+
+        // Track interactive mission state per step id
+        this.completedMissions = new Set();
+        this.stepState = {};
+
+        // Active DOM listeners & beacon elements for the current step (cleaned up on step change/close)
+        this.activeCleanups = [];
+        this.activeBeacons = [];
+
         this.steps = this.buildSteps();
+        this.totalMissions = this.steps.filter(s => !!s.mission).length;
+
         this.createDOM();
         this.bindEvents();
     }
@@ -24,31 +37,54 @@ class FretDSPTutorial {
                 id: 'welcome',
                 category: 'Welcome',
                 shortTitle: 'Welcome to FretDSP',
-                title: 'Welcome to Your All-in-One Guitar Studio',
-                target: null, // Centered modal card
+                title: 'Welcome to Your Interactive Guitar Studio',
+                target: null,
                 icon: '🎸',
-                summary: 'FretDSP turns your browser into a smart guitar workspace. Play a real guitar into your microphone—or just click the screen—to write tabs, tune up, shape your tone, and jam with a backing band.',
+                summary: 'Learn the whole studio in 2 minutes by actually trying it! Each stop highlights a real panel on screen and gives you a quick hands-on mini-challenge.',
+                showModePicker: true,
                 points: [
-                    { label: 'Two ways to play', text: 'Plug in a guitar/mic, OR try everything right now with your mouse and computer keyboard.' },
-                    { label: 'Zero jargon', text: 'This quick 2-minute tour explains each panel in plain English—and lets you test features live along the way.' },
-                    { label: 'Go at your own pace', text: 'Use Next / Back, arrow keys (← →), or jump to any topic using the Topics menu above.' }
+                    { label: 'Learn by doing', text: 'Every spotlighted panel stays clickable—twist knobs, pluck frets, and stomp pedals right during the tour.' },
+                    { label: 'Zero jargon', text: 'Every control is explained in plain English, and you can skip ahead or jump to any topic anytime.' }
                 ],
-                tip: 'Tip: You can replay this tour anytime by clicking "Take a Tour" in the top-right corner.'
+                tip: 'Pick how you plan to play today above, then hit Start Interactive Tour!'
             },
             {
                 id: 'audio-setup',
                 category: 'Step 1 • Setup',
                 shortTitle: 'Mic & Volume Meter',
-                title: 'Pick Your Mic & Check Your Volume',
+                title: 'Pick Your Mic & Watch the Volume Meter',
                 target: '.app-header',
                 icon: '🎙️',
-                summary: 'Before playing a real guitar, this top bar helps you pick the right input and make sure your volume is in the sweet spot.',
+                summary: 'This top bar lets you pick your microphone or guitar interface and check that your signal volume is loud enough without distorting.',
                 points: [
-                    { label: 'Audio Input Source', text: 'Choose your laptop mic, USB microphone, or guitar audio interface from the dropdown.' },
-                    { label: 'Input Gain Meter', text: 'Watch the green-to-yellow bar move as you play. Aim for healthy green/yellow levels.' },
-                    { label: 'CLIP Warning Light', text: 'If the red CLIP light flashes, your signal is too loud and distorting—turn your guitar or mic volume down slightly.' }
+                    { label: 'Audio Input Source', text: 'Select your laptop mic, USB mic, or audio interface.' },
+                    { label: 'Input Gain & CLIP', text: 'Aim for green/yellow on the bar. If red CLIP flashes, lower your volume slightly.' }
                 ],
-                tip: 'No mic plugged in? No problem—keep going! Almost every feature works with clicks and built-in sounds.'
+                mission: {
+                    prompt: 'Check the audio input selector or test the live volume meter!',
+                    beacons: ['.audio-routing-rack', '.gain-meter-rack'],
+                    tasks: [
+                        { id: 'check_signal', label: 'Open Audio Input dropdown OR click "Test Volume Meter" below' }
+                    ],
+                    setup: (ctx) => {
+                        const sel = document.getElementById('selectAudioInput');
+                        ctx.listen(sel, 'mousedown', () => ctx.completeTask('check_signal', 'Input selector ready!'));
+                        ctx.listen(sel, 'change', () => ctx.completeTask('check_signal', 'Audio input selected!'));
+                    }
+                },
+                actions: [
+                    {
+                        label: '🔊 Test Volume Meter',
+                        kind: 'primary',
+                        onClick: (btn, tour) => {
+                            tour.triggerSampleNote('a');
+                            tour.completeCurrentTask('check_signal', 'See the green-yellow meter bounce!');
+                        }
+                    }
+                ],
+                dynamicTip: (mode) => mode === 'guitar'
+                    ? 'Guitar tip: Select your audio interface or mic now so you are ready when we engage listening!'
+                    : 'Mouse & Keyboard tip: No mic needed—click "Test Volume Meter" above to watch the meter react live!'
             },
             {
                 id: 'master-controls',
@@ -57,12 +93,42 @@ class FretDSPTutorial {
                 title: 'Start Listening, Keep Time & Quick Tune',
                 target: '.master-control-bar',
                 icon: '⏱️',
-                summary: 'This strip is your main dashboard for listening to your guitar, setting the beat, cleaning up your timing, and checking notes on the fly.',
+                summary: 'Your main command strip: turn your mic on, set the song speed (BPM), tidy up your timing with Quantize, and check notes on the mini tuner.',
                 points: [
-                    { label: 'Start Listening', text: 'Press this big footswitch to turn your microphone on so FretDSP hears what you play.' },
-                    { label: 'Metronome & Tap', text: 'Set your speed (BPM) with the slider or tap the "Tap" button to match a song in your head. Toggle "Click ON" for an audible beat.' },
-                    { label: 'Quantize', text: 'Automatically tidies up slightly early or late notes onto a neat rhythm grid (like 1/8 or 1/16 notes) so your tab looks clean.' },
-                    { label: 'Mini Pedal Tuner', text: 'Shows the exact note you just played. Green in the middle means in tune; left is flat (too low), right is sharp (too high).' }
+                    { label: 'Start Listening', text: 'Turns on your microphone so FretDSP hears your guitar in real time.' },
+                    { label: 'Metronome & Tap', text: 'Slide BPM or tap "Tap" to match any tempo. Toggle "Click ON" for a beat click.' },
+                    { label: 'Quantize & Mini Tuner', text: 'Quantize snaps messy timing onto the beat; the needle shows flat (left) vs. sharp (right).' }
+                ],
+                mission: {
+                    prompt: 'Try changing the tempo on the live Metronome bar!',
+                    beacons: ['.bpm-controls-group', '#btnTapTempo'],
+                    tasks: [
+                        { id: 'change_bpm', label: 'Drag the BPM slider, click + / -, or tap "Tap" tempo' }
+                    ],
+                    setup: (ctx) => {
+                        const slider = document.getElementById('bpmSlider');
+                        const minus = document.getElementById('btnBpmMinus');
+                        const plus = document.getElementById('btnBpmPlus');
+                        const tap = document.getElementById('btnTapTempo');
+                        const onChange = () => {
+                            const val = slider ? slider.value : '';
+                            ctx.completeTask('change_bpm', `Nice! Tempo updated${val ? ` to ${val} BPM` : ''}.`);
+                        };
+                        ctx.listen(slider, 'input', onChange);
+                        ctx.listen(minus, 'click', onChange);
+                        ctx.listen(plus, 'click', onChange);
+                        ctx.listen(tap, 'click', onChange);
+                    }
+                },
+                actions: [
+                    {
+                        label: '🔔 Toggle Metronome Click',
+                        kind: 'secondary',
+                        onClick: () => {
+                            const btn = document.getElementById('btnMetronomeSound');
+                            if (btn) btn.click();
+                        }
+                    }
                 ]
             },
             {
@@ -72,20 +138,47 @@ class FretDSPTutorial {
                 title: 'Light-Up Fretboard & Live Scale Helper',
                 target: '#sectionFretboard',
                 icon: '✨',
-                summary: 'Watch every note you play light up across all 22 frets—or click directly on any fret to hear it and write it into your tab!',
+                summary: 'Every note you play lights up across all 22 frets—and you can click any fret directly to hear it and write it into your tab!',
                 points: [
-                    { label: 'Tuning & Register', text: 'Switch between Standard, Drop D, DADGAD, and more. "Register" tells the app which part of the neck you prefer to play in.' },
-                    { label: 'Gate Slider', text: 'Ignores quiet room background noise so only real guitar plucks trigger notes.' },
-                    { label: 'Live Chord & Scale Ribbon', text: 'Strum a chord (or pick a Preset) and the fretboard highlights matching solo notes: Blue = core chord tones, Green = smooth passing notes, Red = clashing notes (hidden by default).' }
+                    { label: 'Color-Coded Scale Guide', text: 'Blue = safe chord tones, Green = smooth passing notes, Red = clashing notes (hidden by default).' },
+                    { label: 'Tuning & Register', text: 'Switch tunings (Standard, Drop D, DADGAD) or pick where your hand prefers to play.' }
                 ],
+                mission: {
+                    prompt: 'Play right on the glowing guitar neck & switch a scale!',
+                    beacons: ['#fretboardCanvas', '#selectTestChord'],
+                    tasks: [
+                        { id: 'pluck_3', label: 'Click 3 frets on the neck (or press A, D, G)', targetCount: 3 },
+                        { id: 'change_scale', label: 'Pick a different Chord Preset (or toggle Overlay / Intervals)' }
+                    ],
+                    setup: (ctx) => {
+                        const canvas = document.getElementById('fretboardCanvas');
+                        const preset = document.getElementById('selectTestChord');
+                        const modeSel = document.getElementById('selectOverlayMode');
+                        const overlayBtn = document.getElementById('btnToggleScaleOverlay');
+
+                        ctx.listen(canvas, 'pointerdown', () => ctx.incrementTask('pluck_3', 3, 'notes plucked'));
+                        ctx.listen(window, 'keydown', (e) => {
+                            if (ctx.isTyping(e)) return;
+                            const k = (e.key || '').toLowerCase();
+                            if ('123456asdfghjk'.includes(k)) {
+                                ctx.incrementTask('pluck_3', 3, 'notes plucked');
+                            }
+                        });
+                        ctx.listen(preset, 'change', () => {
+                            ctx.completeTask('change_scale', `Scale switched to ${preset.value}!`);
+                        });
+                        ctx.listen(modeSel, 'change', () => ctx.completeTask('change_scale', 'Label mode updated!'));
+                        ctx.listen(overlayBtn, 'click', () => ctx.completeTask('change_scale', 'Scale overlay toggled!'));
+                    }
+                },
                 actions: [
                     {
-                        label: '🎸 Pluck a Sample Riff on the Neck',
+                        label: '🎸 Play Sample Riff for Me',
                         kind: 'primary',
                         onClick: (btn, tour) => tour.playSampleFretboardArpeggio(btn)
                     }
                 ],
-                tip: 'Try clicking directly on the guitar neck right now—it stays interactive during the tour!'
+                tip: 'Go ahead—click directly on the fretboard above! Each click plays a real string sound and adds a note to your tab.'
             },
             {
                 id: 'tablature',
@@ -94,11 +187,42 @@ class FretDSPTutorial {
                 title: 'Automatic Guitar Tab & Instant Playback',
                 target: '#sectionTablature',
                 icon: '🎼',
-                summary: 'Every note you play on your guitar—or click on the fretboard—gets written automatically onto this 6-string scrolling guitar tab.',
+                summary: 'Everything you play on your guitar—or click on the fretboard—gets written onto this scrolling 6-string tab automatically.',
                 points: [
-                    { label: 'Play Back & Loop', text: 'Hit "Play Back" to hear your written tab played out loud, or turn on "Loop" to repeat it endlessly.' },
-                    { label: 'Pause, Rewind & Clear', text: 'Freeze the scrolling line anytime, jump back to Measure 1, or wipe the sheet clean to start fresh.' },
-                    { label: 'Synth Engine & Zoom', text: 'Switch between a realistic plucked string sound (Karplus-Strong) or a clean synth, and slide "Staff Zoom" to spread notes out or pack them closer.' }
+                    { label: 'Play Back & Loop', text: 'Hear your written tab played out loud, or loop it continuously.' },
+                    { label: 'Synth Engine & Zoom', text: 'Switch between Karplus-Strong plucked string or Poly Clean synth, and zoom note spacing.' }
+                ],
+                mission: {
+                    prompt: 'Test the tab playback or tweak the sound & zoom!',
+                    beacons: ['#btnPlayBack', '#zoomSlider'],
+                    tasks: [
+                        { id: 'use_tab', label: 'Click "Play Back", drag "Staff Zoom", or change Synth Engine' }
+                    ],
+                    setup: (ctx) => {
+                        const playBtn = document.getElementById('btnPlayBack');
+                        const zoom = document.getElementById('zoomSlider');
+                        const synthSel = document.getElementById('selectSynthSound');
+                        const loopBtn = document.getElementById('btnLoopTab');
+                        ctx.listen(playBtn, 'click', () => ctx.completeTask('use_tab', 'Tab playback triggered!'));
+                        ctx.listen(zoom, 'input', () => ctx.completeTask('use_tab', 'Tab spacing zoomed!'));
+                        ctx.listen(synthSel, 'change', () => ctx.completeTask('use_tab', 'Synth engine switched!'));
+                        ctx.listen(loopBtn, 'click', () => ctx.completeTask('use_tab', 'Loop toggled!'));
+                    }
+                },
+                actions: [
+                    {
+                        label: '▶ Add Starter Notes & Play Back',
+                        kind: 'primary',
+                        onClick: (btn, tour) => {
+                            tour.playSampleFretboardArpeggio(btn, () => {
+                                const playBtn = document.getElementById('btnPlayBack');
+                                if (playBtn && !playBtn.classList.contains('btn-playing')) {
+                                    playBtn.click();
+                                }
+                            });
+                            tour.completeCurrentTask('use_tab', 'Starter riff written and playing back!');
+                        }
+                    }
                 ]
             },
             {
@@ -108,12 +232,26 @@ class FretDSPTutorial {
                 title: 'Master Tough Riffs with A-B Loops & Speed Trainer',
                 target: '#practiceTrainerBar',
                 icon: '🎯',
-                summary: 'Built right into the tab dock is a personal practice coach that helps you nail tricky sections cleanly before playing them fast.',
+                summary: 'Your built-in practice coach grades your accuracy, repeats tricky measures on a loop, and speeds up automatically as you improve.',
                 points: [
-                    { label: 'Practice Mode', text: 'Turn this ON while playing along to get live Accuracy %, Streak counts, and instant timing feedback.' },
-                    { label: 'A-B Loop', text: 'Pick a Start Bar and End Bar (like Bar 1 to Bar 2) and click "Set Loop" to repeat just the tricky part.' },
-                    { label: 'Speed Trainer', text: 'Start slow! After every 1, 2, or 4 loops you finish, FretDSP automatically bumps your speed up (+3, +5, or +10 BPM) until you reach full tempo.' }
-                ]
+                    { label: 'Practice Mode', text: 'Turn ON while playing along to see live Accuracy % and Streak counts.' },
+                    { label: 'A-B Loop & Speed Trainer', text: 'Repeat Bars 1–2 and auto-bump BPM (+3, +5, or +10) every few clean loops.' }
+                ],
+                mission: {
+                    prompt: 'Arm your practice coach right on the dock!',
+                    beacons: ['#btnPracticeMode', '#btnToggleSpeedTrainer'],
+                    tasks: [
+                        { id: 'arm_practice', label: 'Click "Practice Mode", "Set Loop", or "Speed Trainer"' }
+                    ],
+                    setup: (ctx) => {
+                        const pBtn = document.getElementById('btnPracticeMode');
+                        const sBtn = document.getElementById('btnToggleSpeedTrainer');
+                        const lBtn = document.getElementById('btnSetLoopRange');
+                        ctx.listen(pBtn, 'click', () => ctx.completeTask('arm_practice', 'Practice Mode toggled!'));
+                        ctx.listen(sBtn, 'click', () => ctx.completeTask('arm_practice', 'Speed Trainer toggled!'));
+                        ctx.listen(lBtn, 'click', () => ctx.completeTask('arm_practice', 'A-B Loop markers set!'));
+                    }
+                }
             },
             {
                 id: 'spectral',
@@ -122,11 +260,35 @@ class FretDSPTutorial {
                 title: 'See Inside Your Sound (Heat-Map)',
                 target: '#sectionSpectral',
                 icon: '🌈',
-                summary: 'This live colorful chart is like an X-ray of your guitar’s tone, moving smoothly in real time as you play.',
+                summary: 'This real-time glowing waterfall is like an X-ray of your tone—showing your main pitch (f₀) and the shimmering overtones (2f₀, 3f₀) stacked above it.',
                 points: [
-                    { label: 'Main Note (f₀)', text: 'The bright cyan peak shows the main pitch of the note you played.' },
-                    { label: 'Overtones (2f₀, 3f₀)', text: 'Every guitar string rings with extra harmonic layers above the main note—that’s what gives your guitar warmth and sparkle.' },
-                    { label: 'Why it helps', text: 'Great for watching how long your notes sustain, spotting unwanted fret buzz, or seeing how effects change your tone.' }
+                    { label: 'Spot Sustain & Buzz', text: 'Clean notes form smooth, bright horizontal bands; fret buzz scatters noisy static.' }
+                ],
+                mission: {
+                    prompt: 'Send a note into the visualizer and watch the harmonic peaks glow!',
+                    beacons: ['#spectralCanvas'],
+                    tasks: [
+                        { id: 'light_spectrum', label: 'Press key A, D, or G—or click "Pulse Sound X-Ray" below' }
+                    ],
+                    setup: (ctx) => {
+                        ctx.listen(window, 'keydown', (e) => {
+                            if (ctx.isTyping(e)) return;
+                            const k = (e.key || '').toLowerCase();
+                            if ('123456asdfghjk'.includes(k)) {
+                                ctx.completeTask('light_spectrum', 'Look at those glowing harmonic overtones!');
+                            }
+                        });
+                    }
+                },
+                actions: [
+                    {
+                        label: '🌈 Pulse Sound X-Ray',
+                        kind: 'primary',
+                        onClick: (btn, tour) => {
+                            tour.playSampleFretboardArpeggio(btn);
+                            tour.completeCurrentTask('light_spectrum', 'Watch the f₀ and 2f₀ lines scroll across!');
+                        }
+                    }
                 ]
             },
             {
@@ -136,30 +298,28 @@ class FretDSPTutorial {
                 title: 'Studio Strobe Tuner & Old-String Detector',
                 target: '#sectionStrobe',
                 icon: '🎯',
-                summary: 'Need ultra-accurate tuning or wondering if it’s time to change your guitar strings? This precision analyzer handles both.',
+                summary: 'Get pinpoint tuning with spinning strobe rings, and check whether your guitar strings are fresh or worn out and stiff.',
                 points: [
-                    { label: 'Reading the Spinning Rings', text: 'Spinning clockwise = sharp (too high). Spinning counter-clockwise = flat (too low). When the ring freezes still, you are dead-on in tune!' },
-                    { label: 'String Wear Gauge', text: 'Old, worn-out strings lose flexibility and their overtones go slightly out of tune. This meter rates your string from Fresh (green) to Worn (red).' },
-                    { label: 'No Mic? Test It Below', text: 'Use the built-in simulator buttons to compare how a brand-new string vs. an old worn string looks and sounds.' }
+                    { label: 'Spinning Rings', text: 'Clockwise = sharp, Counter-clockwise = flat, Frozen still = dead-on in tune!' },
+                    { label: 'String Wear Gauge', text: 'Measures string stiffness so you know when old strings stop ringing true.' }
                 ],
-                actions: [
-                    {
-                        label: '🟢 Simulate Fresh String',
-                        kind: 'secondary',
-                        onClick: () => {
-                            const btn = document.getElementById('btnPluckFresh');
-                            if (btn) btn.click();
-                        }
-                    },
-                    {
-                        label: '🔴 Simulate Worn String',
-                        kind: 'primary',
-                        onClick: () => {
-                            const btn = document.getElementById('btnPluckWorn');
-                            if (btn) btn.click();
-                        }
+                mission: {
+                    prompt: 'Compare a Fresh string vs. a Worn string right in the simulator!',
+                    beacons: ['#btnPluckFresh', '#btnPluckWorn'],
+                    tasks: [
+                        { id: 'pluck_fresh', label: 'Click "Pluck Fresh" to see a healthy green gauge' },
+                        { id: 'pluck_worn', label: 'Click "Pluck Worn" to watch the gauge jump to red!' }
+                    ],
+                    setup: (ctx) => {
+                        const fresh = document.getElementById('btnPluckFresh');
+                        const worn = document.getElementById('btnPluckWorn');
+                        const normal = document.getElementById('btnPluckNormal');
+                        ctx.listen(fresh, 'click', () => ctx.completeTask('pluck_fresh', 'Fresh string: steady ring & green gauge!'));
+                        ctx.listen(worn, 'click', () => ctx.completeTask('pluck_worn', 'Worn string: stiff harmonics & red alert!'));
+                        ctx.listen(normal, 'click', () => ctx.completeTask('pluck_fresh', 'Good playable string analyzed!'));
                     }
-                ]
+                },
+                tip: 'Click the two highlighted buttons inside the panel above (no microphone needed!).'
             },
             {
                 id: 'effects-rack',
@@ -168,11 +328,40 @@ class FretDSPTutorial {
                 title: 'Shape Your Guitar Tone with Stompbox Pedals',
                 target: '#sectionEffectsRack',
                 icon: '🎛️',
-                summary: 'Sculpt your sound with a built-in pedalboard—without messing up pitch detection! Click any round silver footswitch at the bottom of a pedal to turn it ON or OFF.',
+                summary: 'Dial in rock crunch, amp cabinet resonance, analog echo, and lush reverb—all without throwing off pitch tracking!',
                 points: [
-                    { label: 'Tube Screamer & Cabinet Sim', text: 'Add warm rock overdrive crunch, then run it through realistic amp speaker cabinets (like a classic 4x12 rock stack or 1x12 tweed amp).' },
-                    { label: 'Analog Delay & Ambient Reverb', text: 'Add rhythmic echoes and lush room/hall space to make solos sound huge.' },
-                    { label: 'Master Output Bay', text: 'Control overall volume, send built-in playback through your pedals ("Synth to FX"), or enable "Speaker Monitor" to hear your live mic (wear headphones so it doesn’t feedback!).' }
+                    { label: 'Stomp Footswitches', text: 'Click the silver button at the bottom of any pedal to switch it ON or OFF.' },
+                    { label: 'Master Output Bay', text: 'Set overall volume, keep "Synth to FX" ON to hear pedals on playback, and wear headphones if using "Speaker Monitor".' }
+                ],
+                mission: {
+                    prompt: 'Try out your virtual pedalboard—stomp a switch & twist a slider!',
+                    beacons: ['#btnOdStomp', '#odDriveSlider', '#cabProfileSelect'],
+                    tasks: [
+                        { id: 'stomp_pedal', label: 'Click any silver pedal footswitch to toggle its LED' },
+                        { id: 'tweak_knob', label: 'Slide any effect control or change the Cabinet Profile' }
+                    ],
+                    setup: (ctx) => {
+                        ['btnOdStomp', 'btnCabStomp', 'btnDelayStomp', 'btnReverbStomp', 'btnMasterStomp'].forEach(id => {
+                            ctx.listen(document.getElementById(id), 'click', () => ctx.completeTask('stomp_pedal', 'Stompbox switched!'));
+                        });
+                        [
+                            'odDriveSlider', 'odToneSlider', 'odLevelSlider',
+                            'cabPosSlider', 'cabDistSlider',
+                            'delayTimeSlider', 'delayFeedbackSlider', 'delayMixSlider',
+                            'reverbSizeSlider', 'reverbDampingSlider', 'reverbMixSlider',
+                            'masterVolumeSlider'
+                        ].forEach(id => {
+                            ctx.listen(document.getElementById(id), 'input', () => ctx.completeTask('tweak_knob', 'Tone dial adjusted!'));
+                        });
+                        ctx.listen(document.getElementById('cabProfileSelect'), 'change', () => ctx.completeTask('tweak_knob', 'Amp cabinet swapped!'));
+                    }
+                },
+                actions: [
+                    {
+                        label: '🎸 Hear Current Pedal Tone',
+                        kind: 'primary',
+                        onClick: (btn, tour) => tour.triggerSampleNote('a')
+                    }
                 ]
             },
             {
@@ -182,21 +371,38 @@ class FretDSPTutorial {
                 title: 'Jam Live with Your Own Built-In Backing Band',
                 target: '#pedalBackingTrack',
                 icon: '🥁',
-                summary: 'Practice soloing or songwriting anytime with a built-in drummer, bass player, and keyboardist that locks right to your tempo.',
+                summary: 'A built-in drummer, bass player, and keyboardist that groove at your tempo—either on classic progressions or following your live guitar chords!',
                 points: [
-                    { label: 'Pick a Progression—or Let Them Follow You', text: 'Choose 12-Bar Blues, Pop, or Jazz progressions—OR choose "Follow Live Guitar Chords" so the band reacts to whatever chords you strum!' },
-                    { label: 'Switch the Groove', text: 'Change the feel between Rock 8ths, Blues Shuffle, Funk 16ths, or Jazz Walking Bass.' },
-                    { label: 'Instant Mini Mixer', text: 'Adjust Drums, Bass, and Keys volumes separately, or tap D / B / K to mute any player.' }
+                    { label: 'Instant Mix & Mute', text: 'Slide Drums/Bass/Keys levels or tap D, B, K to mute any player.' }
                 ],
+                mission: {
+                    prompt: 'Fire up the Rhythm Trio and change their groove!',
+                    beacons: ['#btnBackingStomp', '#backingGrooveSelect'],
+                    tasks: [
+                        { id: 'toggle_band', label: 'Click the silver Rhythm Trio footswitch (or press B) to start' },
+                        { id: 'change_groove', label: 'Switch Groove Style, Progression, or mute D / B / K' }
+                    ],
+                    setup: (ctx) => {
+                        ctx.listen(document.getElementById('btnBackingStomp'), 'click', () => {
+                            ctx.completeTask('toggle_band', 'Band engaged! Tap the switch again anytime to stop.');
+                            setTimeout(() => ctx.tour.refreshActionButtons(), 120);
+                        });
+                        ctx.listen(document.getElementById('backingGrooveSelect'), 'change', () => ctx.completeTask('change_groove', 'Groove style changed!'));
+                        ctx.listen(document.getElementById('backingProgressionSelect'), 'change', () => ctx.completeTask('change_groove', 'Chord progression changed!'));
+                        ['btnMuteDrums', 'btnMuteBass', 'btnMuteKeys'].forEach(id => {
+                            ctx.listen(document.getElementById(id), 'click', () => ctx.completeTask('change_groove', 'Band member muted/unmuted!'));
+                        });
+                    }
+                },
                 actions: [
                     {
-                        label: '🥁 Toggle Backing Band Preview',
-                        kind: 'primary',
+                        label: '🥁 Start / Stop Band',
+                        kind: 'secondary',
                         dynamicLabel: () => {
                             const status = document.getElementById('backingBypassStatus');
                             return (status && status.textContent.trim() === 'ACCOMPANYING')
                                 ? '⏹ Stop Backing Band'
-                                : '🥁 Preview Backing Band';
+                                : '🥁 Start Backing Band';
                         },
                         onClick: (btn, tour) => {
                             const stomp = document.getElementById('btnBackingStomp');
@@ -210,15 +416,29 @@ class FretDSPTutorial {
                 id: 'action-tray',
                 category: 'Step 10 • Songs & Save',
                 shortTitle: 'Demo Riffs, Export & Share',
-                title: 'Try Famous Demo Riffs, Export & Share',
+                title: 'Play Iconic Demo Riffs, Export & Share',
                 target: '#sectionActionTray',
                 icon: '📤',
-                summary: 'Want instant inspiration—or ready to save a riff you just recorded? Everything for demo playback and sharing lives in this dock.',
+                summary: 'Load famous riffs and practice drills instantly, or export your recorded tabs to ASCII, MIDI, MusicXML (Guitar Pro / MuseScore), or a shareable link!',
                 points: [
-                    { label: 'Demo Riffs & Drills', text: 'Pick an iconic riff (like Sweet Child O’ Mine or Smoke On The Water) or a practice exercise and hit "Play Demo" to see the whole studio come alive.' },
-                    { label: 'Export Anywhere', text: 'Copy clean text ASCII Tabs, download a MIDI file (.mid) for GarageBand/Ableton/Logic, or open "Export Suite" for MusicXML (Guitar Pro & MuseScore) and JSON.' },
-                    { label: 'Copy Shareable Link', text: 'Packs your entire recorded riff right into a web link you can send to a bandmate or friend!' }
+                    { label: 'Shareable Links', text: '"Copy Shareable Link" packs your whole riff into a URL you can send to anyone.' }
                 ],
+                mission: {
+                    prompt: 'Try launching a Demo Riff or opening the Export Suite!',
+                    beacons: ['#btnPlayDemo', '#btnOpenExportModal'],
+                    tasks: [
+                        { id: 'try_tray', label: 'Click "Play Demo", switch Demo Riffs, or open "Export Suite..."' }
+                    ],
+                    setup: (ctx) => {
+                        ctx.listen(document.getElementById('btnPlayDemo'), 'click', () => {
+                            ctx.completeTask('try_tray', 'Demo riff rolling! Watch the fretboard & tab!');
+                            setTimeout(() => ctx.tour.refreshActionButtons(), 120);
+                        });
+                        ctx.listen(document.getElementById('selectDemoSong'), 'change', () => ctx.completeTask('try_tray', 'Demo song picked!'));
+                        ctx.listen(document.getElementById('btnOpenExportModal'), 'click', () => ctx.completeTask('try_tray', 'Export Suite opened!'));
+                        ctx.listen(document.getElementById('btnExportAsciiQuick'), 'click', () => ctx.completeTask('try_tray', 'ASCII Tab exported!'));
+                    }
+                },
                 actions: [
                     {
                         label: '▶ Play Selected Demo Riff',
@@ -239,38 +459,50 @@ class FretDSPTutorial {
             },
             {
                 id: 'shortcuts',
-                category: 'Finish • Pro Tips',
-                shortTitle: 'Keyboard Shortcuts & Jam!',
-                title: 'Play Faster with Quick Keyboard Shortcuts',
+                category: 'Finale • Jam Pad',
+                shortTitle: 'Interactive Jam & Shortcuts',
+                title: 'Final Challenge: Jam on Your Keyboard!',
                 target: '#sectionKeyboardGuide',
                 icon: '⌨️',
-                summary: 'You’ve seen the whole studio! Even without a guitar in your hands, your computer keyboard doubles as a handy instrument and remote control.',
+                summary: 'Even without a guitar handy, your keyboard is a playable instrument and studio remote (Space = Pause, P = Play Back, Q = Quantize, B = Band).',
+                showKeyJamPad: true,
                 points: [
-                    { label: 'Play Notes Instantly', text: 'Press keys 1–6 to pluck open strings, or A S D F G H J K to jam a rock pentatonic scale.' },
-                    { label: 'Control Playback Hands-Free', text: 'Space pauses scrolling, P plays back your tab, L toggles Loop, R rewinds, Q tidies up timing, and B toggles the Backing Band.' },
-                    { label: 'Need a Refresher?', text: 'Click "Take a Tour" at the top right anytime to revisit any feature.' }
+                    { label: 'Replay Anytime', text: 'Click "Take a Tour" in the top-right header whenever you want a quick refresher.' }
                 ],
-                tip: 'You’re all set! Click "Finish & Start Playing" to jump right in.'
+                mission: {
+                    prompt: 'Play 4 notes right now using keys A–K (or click the keys below)!',
+                    beacons: ['#sectionKeyboardGuide'],
+                    tasks: [
+                        { id: 'jam_4', label: 'Play 4 notes on the mini keyboard jam pad', targetCount: 4 }
+                    ],
+                    setup: (ctx) => {
+                        ctx.listen(window, 'keydown', (e) => {
+                            if (ctx.isTyping(e)) return;
+                            const k = (e.key || '').toLowerCase();
+                            if ('123456asdfghjk'.includes(k)) {
+                                ctx.tour.flashJamKey(k);
+                                ctx.incrementTask('jam_4', 4, 'notes jammed');
+                            }
+                        });
+                    }
+                }
             }
         ];
     }
 
     createDOM() {
-        // Full-screen dim overlay (used when step has no specific target element)
         this.backdropEl = document.createElement('div');
         this.backdropEl.className = 'tour-backdrop-full';
         this.backdropEl.setAttribute('aria-hidden', 'true');
 
-        // Glowing spotlight cutout ring (uses giant box-shadow so target stays clickable!)
         this.spotlightEl = document.createElement('div');
         this.spotlightEl.className = 'tour-spotlight';
         this.spotlightEl.setAttribute('aria-hidden', 'true');
 
-        // Floating Tour Card
         this.cardEl = document.createElement('div');
         this.cardEl.className = 'tour-card';
         this.cardEl.setAttribute('role', 'dialog');
-        this.cardEl.setAttribute('aria-label', 'FretDSP Guided Feature Tour');
+        this.cardEl.setAttribute('aria-label', 'FretDSP Interactive Guided Tour');
         this.cardEl.innerHTML = `
             <div class="tour-progress-track">
                 <div class="tour-progress-fill" id="tourProgressFill"></div>
@@ -280,6 +512,7 @@ class FretDSPTutorial {
                 <div class="tour-meta-left">
                     <span class="tour-category-pill" id="tourCategoryPill">Welcome</span>
                     <span class="tour-step-counter" id="tourStepCounter">1 / 12</span>
+                    <span class="tour-score-pill" id="tourScorePill" title="Hands-on challenges completed">⭐ 0/${this.totalMissions}</span>
                 </div>
                 <div class="tour-meta-right">
                     <button type="button" class="tour-topics-btn" id="tourTopicsBtn" title="Jump to any feature">
@@ -289,7 +522,6 @@ class FretDSPTutorial {
                 </div>
             </div>
 
-            <!-- Collapsible Topics Jump Menu -->
             <div class="tour-topics-menu" id="tourTopicsMenu" hidden></div>
 
             <div class="tour-card-body">
@@ -298,6 +530,37 @@ class FretDSPTutorial {
                     <h2 class="tour-step-title" id="tourStepTitle"></h2>
                 </div>
                 <p class="tour-step-summary" id="tourStepSummary"></p>
+
+                <!-- Welcome Mode Picker -->
+                <div class="tour-mode-picker" id="tourModePicker" hidden>
+                    <button type="button" class="tour-mode-card active" data-mode="mouse">
+                        <span class="tour-mode-emoji">💻</span>
+                        <strong>Mouse &amp; Keyboard</strong>
+                        <span>Click frets &amp; try built-in sounds right away</span>
+                    </button>
+                    <button type="button" class="tour-mode-card" data-mode="guitar">
+                        <span class="tour-mode-emoji">🎸</span>
+                        <strong>Real Guitar + Mic</strong>
+                        <span>Play live through your mic or audio interface</span>
+                    </button>
+                </div>
+
+                <!-- Interactive Hands-On Mission Box -->
+                <div class="tour-mission-box" id="tourMissionBox" hidden>
+                    <div class="tour-mission-header">
+                        <span class="tour-mission-badge" id="tourMissionBadge">🎯 YOUR TURN</span>
+                        <span class="tour-mission-prompt" id="tourMissionPrompt"></span>
+                    </div>
+                    <ul class="tour-mission-checklist" id="tourMissionChecklist"></ul>
+                    <div class="tour-mission-feedback" id="tourMissionFeedback" hidden></div>
+                </div>
+
+                <!-- Interactive Keyboard Jam Pad (Finale Step) -->
+                <div class="tour-jam-pad" id="tourJamPad" hidden>
+                    <div class="tour-jam-keys" id="tourJamKeys"></div>
+                    <div class="tour-finale-summary" id="tourFinaleSummary"></div>
+                </div>
+
                 <ul class="tour-points-list" id="tourPointsList"></ul>
                 <div class="tour-actions-row" id="tourActionsRow" hidden></div>
                 <div class="tour-tip-box" id="tourTipBox" hidden></div>
@@ -317,16 +580,26 @@ class FretDSPTutorial {
         document.body.appendChild(this.spotlightEl);
         document.body.appendChild(this.cardEl);
 
-        // Cache references
+        // Cache DOM refs
         this.progressFill = this.cardEl.querySelector('#tourProgressFill');
         this.categoryPill = this.cardEl.querySelector('#tourCategoryPill');
         this.stepCounter = this.cardEl.querySelector('#tourStepCounter');
+        this.scorePill = this.cardEl.querySelector('#tourScorePill');
         this.topicsBtn = this.cardEl.querySelector('#tourTopicsBtn');
         this.topicsMenu = this.cardEl.querySelector('#tourTopicsMenu');
         this.closeBtn = this.cardEl.querySelector('#tourCloseBtn');
         this.stepIcon = this.cardEl.querySelector('#tourStepIcon');
         this.stepTitle = this.cardEl.querySelector('#tourStepTitle');
         this.stepSummary = this.cardEl.querySelector('#tourStepSummary');
+        this.modePicker = this.cardEl.querySelector('#tourModePicker');
+        this.missionBox = this.cardEl.querySelector('#tourMissionBox');
+        this.missionBadge = this.cardEl.querySelector('#tourMissionBadge');
+        this.missionPrompt = this.cardEl.querySelector('#tourMissionPrompt');
+        this.missionChecklist = this.cardEl.querySelector('#tourMissionChecklist');
+        this.missionFeedback = this.cardEl.querySelector('#tourMissionFeedback');
+        this.jamPad = this.cardEl.querySelector('#tourJamPad');
+        this.jamKeysWrap = this.cardEl.querySelector('#tourJamKeys');
+        this.finaleSummary = this.cardEl.querySelector('#tourFinaleSummary');
         this.pointsList = this.cardEl.querySelector('#tourPointsList');
         this.actionsRow = this.cardEl.querySelector('#tourActionsRow');
         this.tipBox = this.cardEl.querySelector('#tourTipBox');
@@ -337,6 +610,7 @@ class FretDSPTutorial {
 
         this.buildTopicsMenu();
         this.buildProgressDots();
+        this.buildJamPadKeys();
     }
 
     buildTopicsMenu() {
@@ -346,10 +620,12 @@ class FretDSPTutorial {
             item.type = 'button';
             item.className = 'tour-topic-item';
             item.dataset.stepIndex = idx;
+            item.dataset.stepId = step.id;
             item.innerHTML = `
                 <span class="tour-topic-num">${idx + 1}</span>
                 <span class="tour-topic-icon">${step.icon}</span>
                 <span class="tour-topic-name">${step.shortTitle}</span>
+                <span class="tour-topic-check" aria-hidden="true"></span>
             `;
             item.addEventListener('click', () => {
                 this.toggleTopics(false);
@@ -372,8 +648,39 @@ class FretDSPTutorial {
         });
     }
 
+    buildJamPadKeys() {
+        const keys = [
+            { key: 'a', note: 'A2' },
+            { key: 's', note: 'C3' },
+            { key: 'd', note: 'D3' },
+            { key: 'f', note: 'E3' },
+            { key: 'g', note: 'G3' },
+            { key: 'h', note: 'A3' },
+            { key: 'j', note: 'C4' },
+            { key: 'k', note: 'D4' }
+        ];
+        this.jamKeysWrap.innerHTML = '';
+        keys.forEach(item => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'tour-jam-key';
+            btn.dataset.key = item.key;
+            btn.innerHTML = `<kbd>${item.key.toUpperCase()}</kbd><span>${item.note}</span>`;
+            btn.addEventListener('click', () => {
+                this.triggerSampleNote(item.key);
+            });
+            this.jamKeysWrap.appendChild(btn);
+        });
+    }
+
+    flashJamKey(k) {
+        const el = this.jamKeysWrap.querySelector(`.tour-jam-key[data-key="${k}"]`);
+        if (!el) return;
+        el.classList.add('pressed');
+        setTimeout(() => el.classList.remove('pressed'), 260);
+    }
+
     bindEvents() {
-        // Header launch button
         const launchBtn = document.getElementById('btnStartTour');
         if (launchBtn) {
             launchBtn.addEventListener('click', () => this.start(0));
@@ -388,10 +695,18 @@ class FretDSPTutorial {
             this.toggleTopics(!this.isTopicsOpen);
         });
 
-        // Clicking dim full-screen backdrop closes welcome card
         this.backdropEl.addEventListener('click', () => this.close());
 
-        // Keyboard navigation while tour is open
+        // Welcome mode cards
+        this.modePicker.querySelectorAll('.tour-mode-card').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.userMode = btn.dataset.mode || 'mouse';
+                this.modePicker.querySelectorAll('.tour-mode-card').forEach(b => {
+                    b.classList.toggle('active', b === btn);
+                });
+            });
+        });
+
         window.addEventListener('keydown', (e) => {
             if (!this.isOpen) return;
             if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT')) {
@@ -409,7 +724,6 @@ class FretDSPTutorial {
             }
         });
 
-        // Keep spotlight & card anchored on scroll or resize
         const scheduleReposition = () => {
             if (!this.isOpen) return;
             if (this.rafId) cancelAnimationFrame(this.rafId);
@@ -435,6 +749,7 @@ class FretDSPTutorial {
     close() {
         this.isOpen = false;
         this.toggleTopics(false);
+        this.cleanupStepInteractions();
         this.clearDemoTimers();
         this.cardEl.classList.remove('open', 'tour-card-centered');
         this.backdropEl.classList.remove('open');
@@ -474,10 +789,135 @@ class FretDSPTutorial {
 
     goTo(index) {
         if (index < 0 || index >= this.steps.length) return;
+        this.cleanupStepInteractions();
         this.currentIndex = index;
         this.toggleTopics(false);
         this.renderStepContent();
+        this.attachStepInteractions();
         this.positionCurrentStep(true);
+    }
+
+    getStepState(stepId) {
+        if (!this.stepState[stepId]) {
+            this.stepState[stepId] = { tasks: {}, counts: {}, feedback: '' };
+        }
+        return this.stepState[stepId];
+    }
+
+    cleanupStepInteractions() {
+        this.activeCleanups.forEach(fn => {
+            try { fn(); } catch (e) {}
+        });
+        this.activeCleanups = [];
+
+        this.activeBeacons.forEach(el => {
+            if (el && el.classList) el.classList.remove('tour-beacon-target');
+        });
+        this.activeBeacons = [];
+    }
+
+    attachStepInteractions() {
+        const step = this.steps[this.currentIndex];
+        if (!step || !step.mission) return;
+
+        // Add subtle pulsing beacons on target controls
+        if (Array.isArray(step.mission.beacons)) {
+            step.mission.beacons.forEach(sel => {
+                const el = document.querySelector(sel);
+                if (el) {
+                    el.classList.add('tour-beacon-target');
+                    this.activeBeacons.push(el);
+                }
+            });
+        }
+
+        const ctx = {
+            tour: this,
+            isTyping: (e) => e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT'),
+            listen: (el, eventName, handler) => {
+                if (!el || typeof el.addEventListener !== 'function') return;
+                el.addEventListener(eventName, handler);
+                this.activeCleanups.push(() => el.removeEventListener(eventName, handler));
+            },
+            completeTask: (taskId, feedbackMsg) => {
+                this.completeTaskForStep(step.id, taskId, feedbackMsg);
+            },
+            incrementTask: (taskId, targetCount, unitLabel) => {
+                this.incrementTaskForStep(step.id, taskId, targetCount, unitLabel);
+            }
+        };
+
+        if (typeof step.mission.setup === 'function') {
+            step.mission.setup(ctx);
+        }
+    }
+
+    completeCurrentTask(taskId, feedbackMsg) {
+        const step = this.steps[this.currentIndex];
+        if (step && step.mission) {
+            this.completeTaskForStep(step.id, taskId, feedbackMsg);
+        }
+    }
+
+    incrementTaskForStep(stepId, taskId, targetCount, unitLabel = 'done') {
+        const state = this.getStepState(stepId);
+        const current = (state.counts[taskId] || 0) + 1;
+        state.counts[taskId] = Math.min(targetCount, current);
+
+        if (state.counts[taskId] >= targetCount) {
+            this.completeTaskForStep(stepId, taskId, `Awesome! ${targetCount}/${targetCount} ${unitLabel}!`);
+        } else {
+            state.feedback = `Nice! ${state.counts[taskId]} / ${targetCount} ${unitLabel} — keep going!`;
+            if (this.steps[this.currentIndex]?.id === stepId) {
+                this.renderMissionUI();
+            }
+        }
+    }
+
+    completeTaskForStep(stepId, taskId, feedbackMsg = '') {
+        const step = this.steps.find(s => s.id === stepId);
+        if (!step || !step.mission) return;
+
+        const state = this.getStepState(stepId);
+        state.tasks[taskId] = true;
+        if (feedbackMsg) state.feedback = feedbackMsg;
+
+        // Check if every task in this step's mission is done
+        const allDone = step.mission.tasks.every(t => !!state.tasks[t.id]);
+        if (allDone && !this.completedMissions.has(stepId)) {
+            this.completedMissions.add(stepId);
+            this.updateScoreUI(true);
+        } else {
+            this.updateScoreUI(false);
+        }
+
+        if (this.steps[this.currentIndex]?.id === stepId) {
+            this.renderMissionUI();
+            if (step.showKeyJamPad) {
+                this.renderFinaleSummary();
+            }
+        }
+    }
+
+    updateScoreUI(pop = false) {
+        const done = this.completedMissions.size;
+        this.scorePill.textContent = `⭐ ${done}/${this.totalMissions}`;
+        this.scorePill.classList.toggle('has-score', done > 0);
+        if (pop) {
+            this.scorePill.classList.remove('score-pop');
+            void this.scorePill.offsetWidth;
+            this.scorePill.classList.add('score-pop');
+        }
+
+        // Update topics menu checkmarks
+        this.topicsMenu.querySelectorAll('.tour-topic-item').forEach(item => {
+            const id = item.dataset.stepId;
+            const checkEl = item.querySelector('.tour-topic-check');
+            if (checkEl) {
+                checkEl.textContent = this.completedMissions.has(id) ? '✓' : '';
+            }
+            item.classList.toggle('mission-done', this.completedMissions.has(id));
+        });
     }
 
     renderStepContent() {
@@ -492,7 +932,19 @@ class FretDSPTutorial {
         this.stepTitle.textContent = step.title;
         this.stepSummary.textContent = step.summary;
 
-        // Render bullet points
+        // Mode picker (Welcome only)
+        this.modePicker.hidden = !step.showModePicker;
+
+        // Interactive Mission Box
+        this.renderMissionUI();
+
+        // Interactive Finale Jam Pad
+        this.jamPad.hidden = !step.showKeyJamPad;
+        if (step.showKeyJamPad) {
+            this.renderFinaleSummary();
+        }
+
+        // Bullet points
         this.pointsList.innerHTML = '';
         (step.points || []).forEach((pt) => {
             const li = document.createElement('li');
@@ -500,7 +952,7 @@ class FretDSPTutorial {
             this.pointsList.appendChild(li);
         });
 
-        // Render optional interactive Try-It buttons
+        // Action buttons
         this.actionsRow.innerHTML = '';
         if (Array.isArray(step.actions) && step.actions.length > 0) {
             this.actionsRow.hidden = false;
@@ -517,24 +969,26 @@ class FretDSPTutorial {
             this.actionsRow.hidden = true;
         }
 
-        // Render optional tip
-        if (step.tip) {
+        // Tip (supports mode-aware dynamicTip or static tip)
+        const resolvedTip = typeof step.dynamicTip === 'function' ? step.dynamicTip(this.userMode) : step.tip;
+        if (resolvedTip) {
             this.tipBox.hidden = false;
-            this.tipBox.textContent = step.tip;
+            this.tipBox.textContent = resolvedTip;
         } else {
             this.tipBox.hidden = true;
         }
 
-        // Update progress dots & topics highlight
+        // Progress dots & Topics menu active state
         this.dotsWrap.querySelectorAll('.tour-dot').forEach((dot, idx) => {
+            const s = this.steps[idx];
             dot.classList.toggle('active', idx === this.currentIndex);
-            dot.classList.toggle('completed', idx < this.currentIndex);
+            dot.classList.toggle('completed', idx < this.currentIndex || this.completedMissions.has(s.id));
         });
         this.topicsMenu.querySelectorAll('.tour-topic-item').forEach((item, idx) => {
             item.classList.toggle('active', idx === this.currentIndex);
         });
 
-        // Update navigation buttons
+        // Navigation buttons
         const isFirst = this.currentIndex === 0;
         const isLast = this.currentIndex === total - 1;
 
@@ -543,12 +997,60 @@ class FretDSPTutorial {
         this.btnSkip.style.display = isLast ? 'none' : 'inline-flex';
 
         if (isFirst) {
-            this.btnNext.textContent = 'Start 2-Min Tour →';
+            this.btnNext.textContent = 'Start Interactive Tour →';
         } else if (isLast) {
-            this.btnNext.textContent = 'Finish & Start Playing ✓';
+            this.btnNext.textContent = 'Finish & Start Jamming ✓';
         } else {
             this.btnNext.textContent = 'Next →';
         }
+    }
+
+    renderMissionUI() {
+        const step = this.steps[this.currentIndex];
+        if (!step || !step.mission) {
+            this.missionBox.hidden = true;
+            return;
+        }
+
+        this.missionBox.hidden = false;
+        const state = this.getStepState(step.id);
+        const allDone = step.mission.tasks.every(t => !!state.tasks[t.id]);
+
+        this.missionBox.classList.toggle('mission-completed', allDone);
+        this.missionBadge.textContent = allDone ? '✓ COMPLETED' : '🎯 YOUR TURN';
+        this.missionPrompt.textContent = step.mission.prompt;
+
+        this.missionChecklist.innerHTML = '';
+        step.mission.tasks.forEach(task => {
+            const isDone = !!state.tasks[task.id];
+            const li = document.createElement('li');
+            li.className = `tour-task-item${isDone ? ' done' : ''}`;
+            const countSuffix = (!isDone && task.targetCount)
+                ? ` <span class="tour-task-count">(${state.counts[task.id] || 0}/${task.targetCount})</span>`
+                : '';
+            li.innerHTML = `
+                <span class="tour-task-check">${isDone ? '✓' : '○'}</span>
+                <span class="tour-task-text">${task.label}${countSuffix}</span>
+            `;
+            this.missionChecklist.appendChild(li);
+        });
+
+        if (state.feedback) {
+            this.missionFeedback.hidden = false;
+            this.missionFeedback.textContent = state.feedback;
+        } else {
+            this.missionFeedback.hidden = true;
+        }
+    }
+
+    renderFinaleSummary() {
+        const done = this.completedMissions.size;
+        const msg = done >= this.totalMissions
+            ? `🏆 Tour Master! You completed all ${done}/${this.totalMissions} hands-on challenges!`
+            : done > 0
+                ? `🎉 Awesome job! You completed ${done} of ${this.totalMissions} hands-on challenges.`
+                : `🎸 You’ve toured every feature—press any glowing key above to jam!`;
+        this.finaleSummary.textContent = msg;
     }
 
     refreshActionButtons() {
@@ -566,7 +1068,6 @@ class FretDSPTutorial {
         const step = this.steps[this.currentIndex];
         const targetEl = step.target ? document.querySelector(step.target) : null;
 
-        // Centered welcome mode (no spotlight target)
         if (!targetEl) {
             this.spotlightEl.classList.remove('open');
             this.backdropEl.classList.add('open');
@@ -578,14 +1079,12 @@ class FretDSPTutorial {
             return;
         }
 
-        // Targeted spotlight mode
         this.backdropEl.classList.remove('open');
         this.cardEl.classList.remove('tour-card-centered');
 
         if (shouldScroll) {
             const initialRect = targetEl.getBoundingClientRect();
             const vh = window.innerHeight;
-            // Scroll target comfortably into the upper-middle part of the viewport
             const targetTopDoc = initialRect.top + window.scrollY;
             const desiredTop = initialRect.height > vh * 0.65
                 ? Math.max(0, targetTopDoc - 24)
@@ -596,7 +1095,6 @@ class FretDSPTutorial {
                 behavior: 'smooth'
             });
 
-            // Re-run positioning after smooth scroll settles
             setTimeout(() => {
                 if (this.isOpen) this.positionCurrentStep(false);
             }, 380);
@@ -607,7 +1105,6 @@ class FretDSPTutorial {
         const vw = window.innerWidth;
         const vh = window.innerHeight;
 
-        // Position spotlight cutout ring around the target panel
         const spotTop = Math.max(-20, rect.top - pad);
         const spotLeft = Math.max(4, rect.left - pad);
         const spotWidth = Math.min(vw - 8, rect.width + pad * 2);
@@ -619,11 +1116,10 @@ class FretDSPTutorial {
         this.spotlightEl.style.height = `${spotHeight}px`;
         this.spotlightEl.classList.add('open');
 
-        // Measure card dimensions for smart placement
-        const cardWidth = Math.min(480, vw - 24);
+        const cardWidth = Math.min(490, vw - 24);
         this.cardEl.style.width = `${cardWidth}px`;
         const cardRect = this.cardEl.getBoundingClientRect();
-        const cardHeight = cardRect.height || 320;
+        const cardHeight = cardRect.height || 360;
         const margin = 16;
 
         const spaceBelow = vh - (rect.bottom + pad);
@@ -632,23 +1128,18 @@ class FretDSPTutorial {
         let top;
         let left;
 
-        // Center horizontally relative to the highlighted target, clamped to viewport
         const idealLeft = rect.left + (rect.width / 2) - (cardWidth / 2);
         left = Math.max(margin, Math.min(vw - cardWidth - margin, idealLeft));
 
         if (spaceBelow >= cardHeight + margin) {
-            // Fits comfortably below the highlighted section
             top = rect.bottom + pad + 14;
         } else if (spaceAbove >= cardHeight + margin) {
-            // Fits comfortably above the highlighted section
             top = rect.top - pad - cardHeight - 14;
         } else {
-            // Section fills most of the screen: dock neatly at bottom-right so user can still inspect the panel
             top = Math.max(margin, vh - cardHeight - margin);
             left = Math.max(margin, vw - cardWidth - margin);
         }
 
-        // Final viewport clamp
         top = Math.max(margin, Math.min(vh - cardHeight - margin, top));
 
         this.cardEl.style.top = `${Math.round(top)}px`;
@@ -657,25 +1148,30 @@ class FretDSPTutorial {
         this.cardEl.style.bottom = 'auto';
     }
 
-    /**
-     * Interactive demo for Step 4: Plucks an A-minor pentatonic phrase using
-     * the app's own real keyboard/fretboard pipeline so users see and hear it live!
-     */
-    playSampleFretboardArpeggio(btn) {
+    triggerSampleNote(key = 'a') {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+    }
+
+    playSampleFretboardArpeggio(btn, onDone) {
         this.clearDemoTimers();
         const keys = ['a', 'd', 'g', 'j', 'k', 'j', 'g', 'a'];
-        const originalText = btn.textContent;
-        btn.disabled = true;
-        btn.textContent = '🎵 Playing sample phrase...';
+        const originalText = btn ? btn.textContent : '';
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = '🎵 Playing sample phrase...';
+        }
 
         keys.forEach((k, idx) => {
             const t = setTimeout(() => {
-                window.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }));
+                this.triggerSampleNote(k);
                 if (idx === keys.length - 1) {
-                    btn.disabled = false;
-                    btn.textContent = originalText;
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.textContent = originalText;
+                    }
+                    if (typeof onDone === 'function') onDone();
                 }
-            }, idx * 210);
+            }, idx * 200);
             this.demoPluckTimers.push(t);
         });
     }
@@ -690,7 +1186,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const tutorial = new FretDSPTutorial();
     window.fretDSPTutorial = tutorial;
 
-    // Auto-greet first-time visitors after canvases finish initial paint
     if (!tutorial.hasBeenSeen() && !window.location.hash.startsWith('#riff=')) {
         setTimeout(() => {
             if (!tutorial.isOpen) {

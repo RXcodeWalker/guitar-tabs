@@ -273,6 +273,78 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, 3200);
     }
 
+    // =========================================================================
+    // Light / Dark Theme Mode Manager
+    // =========================================================================
+    const btnThemeToggle = document.getElementById('btnThemeToggle');
+    const themeToggleIcon = document.getElementById('themeToggleIcon');
+    const themeToggleLabel = document.getElementById('themeToggleLabel');
+
+    function getInitialTheme() {
+        try {
+            const saved = localStorage.getItem('fretdsp_theme');
+            if (saved === 'light' || saved === 'dark') return saved;
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+                return 'light';
+            }
+        } catch (_) {}
+        return 'dark';
+    }
+
+    function applyTheme(theme, save = true) {
+        const isLight = theme === 'light';
+        document.documentElement.setAttribute('data-theme', isLight ? 'light' : 'dark');
+        if (document.body) {
+            document.body.classList.toggle('light-theme', isLight);
+        }
+
+        if (btnThemeToggle) {
+            btnThemeToggle.setAttribute('aria-pressed', isLight ? 'true' : 'false');
+            btnThemeToggle.title = isLight ? 'Switch to Dark Mode (Shortcut: T)' : 'Switch to Light Mode (Shortcut: T)';
+        }
+        if (themeToggleIcon) {
+            themeToggleIcon.textContent = isLight ? '🌙' : '☀️';
+        }
+        if (themeToggleLabel) {
+            themeToggleLabel.textContent = isLight ? 'Dark Mode' : 'Light Mode';
+        }
+
+        // Inform sub-components (tablature, spectral visualizer, fretboard)
+        if (typeof tablature !== 'undefined' && tablature && typeof tablature.setTheme === 'function') {
+            tablature.setTheme(isLight ? 'light' : 'dark');
+        }
+        if (typeof spectralVisualizer !== 'undefined' && spectralVisualizer && typeof spectralVisualizer.setTheme === 'function') {
+            spectralVisualizer.setTheme(isLight ? 'light' : 'dark');
+        }
+        if (typeof fretboard !== 'undefined' && fretboard && typeof fretboard.render === 'function') {
+            fretboard.render();
+        }
+
+        if (save) {
+            try {
+                localStorage.setItem('fretdsp_theme', isLight ? 'light' : 'dark');
+            } catch (_) {}
+        }
+
+        try {
+            window.dispatchEvent(new CustomEvent('fretdsp-theme-change', { detail: { theme: isLight ? 'light' : 'dark' } }));
+        } catch (_) {}
+    }
+
+    function toggleTheme() {
+        const isCurrentlyLight = document.documentElement.getAttribute('data-theme') === 'light' || (document.body && document.body.classList.contains('light-theme'));
+        const nextTheme = isCurrentlyLight ? 'dark' : 'light';
+        applyTheme(nextTheme, true);
+        showToast(nextTheme === 'light' ? '☀️ Clean Light Mode enabled' : '🌙 Dark Studio Mode enabled', 'info');
+    }
+
+    if (btnThemeToggle) {
+        btnThemeToggle.addEventListener('click', () => toggleTheme());
+    }
+
+    // Apply initial theme on startup
+    applyTheme(getInitialTheme(), false);
+
     // Start tablature auto-scroll by default
     tablature.play();
 
@@ -1730,6 +1802,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (e.key.toLowerCase() === 'r') {
             tablature.rewind();
             showToast('Rewound timeline.');
+            return;
+        }
+
+        if (e.key.toLowerCase() === 't') {
+            e.preventDefault();
+            toggleTheme();
             return;
         }
 

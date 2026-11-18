@@ -277,6 +277,7 @@ console.log('========================================');
 | `test_chord_engine.js` | Polyphonic Chord Engine | Pitch class profiling, chord dictionary matching, scale recommendations |
 | `test_exporter_xml.js` | Exporters | Well-formed XML tags, MusicXML 3.1 & 4.0 specifications, SMF Type 0 MIDI |
 | `test_spectral_visualizer.js`| Spectral Waterfall Visualizer | FFT bins, overtone harmonic tagging ($f_0$, $2f_0$, $3f_0$, $4f_0$) |
+| `test_light_mode.js` | Clean Light Mode & Theme Toggle | Dynamic color scheme switching, canvas palette delegation, persistence |
 
 ---
 
@@ -294,6 +295,7 @@ FretDSP supports full keyboard control for hands-on-guitar interaction without n
 | <kbd>Q</kbd> | Quantize recorded tablature to active grid subdivision |
 | <kbd>R</kbd> | Rewind playhead to measure 1 |
 | <kbd>B</kbd> | Engage / Stop Smart Backing Track Accompaniment |
+| <kbd>T</kbd> | Toggle Clean Light Mode / Boutique Dark Studio Mode |
 
 ---
 

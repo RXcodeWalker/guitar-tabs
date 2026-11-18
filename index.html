@@ -8,6 +8,17 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/styles.css">
+    <script>
+        (function() {
+            try {
+                var savedTheme = localStorage.getItem('fretdsp_theme');
+                var prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+                if (savedTheme === 'light' || (!savedTheme && prefersLight)) {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                }
+            } catch (e) {}
+        })();
+    </script>
 </head>
 <body>
     <div class="app-container">
@@ -72,11 +83,19 @@
                 </span>
             </div>
 
-            <!-- Interactive Guided Tour Button -->
-            <button id="btnStartTour" class="tour-launch-btn" title="Take a plain-English guided tour of every feature">
-                <span class="tour-launch-icon">🎓</span>
-                <span>Take a Tour</span>
-            </button>
+            <!-- Header Action Controls: Theme Switcher & Tour Guide -->
+            <div class="header-action-group">
+                <button id="btnThemeToggle" class="theme-toggle-btn" title="Toggle Light / Dark Mode (Shortcut: T)" aria-label="Toggle Light or Dark Mode">
+                    <span id="themeToggleIcon" class="theme-toggle-icon">☀️</span>
+                    <span id="themeToggleLabel">Light Mode</span>
+                </button>
+
+                <!-- Interactive Guided Tour Button -->
+                <button id="btnStartTour" class="tour-launch-btn" title="Take a plain-English guided tour of every feature">
+                    <span class="tour-launch-icon">🎓</span>
+                    <span>Take a Tour</span>
+                </button>
+            </div>
         </header>
 
         <!-- 2. MASTER CONTROL BAR: Stomp Switch, BPM Slider, Quantize, Pedal Tuner -->
@@ -922,6 +941,9 @@
                 </div>
                 <div class="guide-key-item">
                     <kbd>B</kbd> <span>Accompaniment</span>
+                </div>
+                <div class="guide-key-item">
+                    <kbd>T</kbd> <span>Theme</span>
                 </div>
             </div>
             <div>

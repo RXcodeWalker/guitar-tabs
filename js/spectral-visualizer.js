@@ -520,6 +520,49 @@ class SpectralHeatmapVisualizer {
         }
     }
 
+    /**
+     * Updates colors for Clean Light Mode vs. Boutique Dark Mode.
+     * @param {'light'|'dark'} theme
+     */
+    setTheme(theme) {
+        this.theme = theme;
+        if (theme === 'light') {
+            this.colors = Object.assign(this.colors, {
+                bg: '#ffffff',
+                panelBg: '#f8fafc',
+                panelBgTop: '#ffffff',
+                panelBgBottom: '#f1f5f9',
+                gridLine: 'rgba(0, 0, 0, 0.08)',
+                gridText: '#64748b',
+                gridDash: 'rgba(0, 0, 0, 0.05)',
+                curveStroke: '#0284c7',
+                curveGlow: 'rgba(2, 132, 199, 0.35)',
+                fillGradientTop: 'rgba(2, 132, 199, 0.22)',
+                fillGradientBottom: 'rgba(241, 245, 249, 0.0)',
+                amberOvertone: '#d97706',
+                cyanFundamental: '#0284c7',
+                peakWhite: '#0f172a'
+            });
+        } else {
+            this.colors = Object.assign(this.colors, {
+                bg: '#121214',
+                panelBg: '#0e0e10',
+                panelBgTop: '#15151a',
+                panelBgBottom: '#0e0e12',
+                gridLine: 'rgba(255, 255, 255, 0.06)',
+                gridText: '#64748b',
+                gridDash: 'rgba(255, 255, 255, 0.04)',
+                curveStroke: '#00f3ff',
+                curveGlow: 'rgba(0, 243, 255, 0.4)',
+                fillGradientTop: 'rgba(0, 243, 255, 0.28)',
+                fillGradientBottom: 'rgba(18, 18, 22, 0.0)',
+                amberOvertone: '#ffb020',
+                cyanFundamental: '#00f3ff',
+                peakWhite: '#ffffff'
+            });
+        }
+    }
+
     drawFrame() {
         if (!this.canvas || !this.ctx) return;
 
@@ -575,8 +618,8 @@ class SpectralHeatmapVisualizer {
 
         // Gradient background
         const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
-        bgGrad.addColorStop(0, '#15151a');
-        bgGrad.addColorStop(1, '#0e0e12');
+        bgGrad.addColorStop(0, this.colors.panelBgTop || '#15151a');
+        bgGrad.addColorStop(1, this.colors.panelBgBottom || '#0e0e12');
         ctx.fillStyle = bgGrad;
         ctx.fillRect(0, 0, w, h);
 
@@ -605,7 +648,7 @@ class SpectralHeatmapVisualizer {
 
         // Horizontal dB Guidelines (-12 dB, -24 dB, -36 dB)
         ctx.setLineDash([3, 5]);
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+        ctx.strokeStyle = this.colors.gridDash || 'rgba(255, 255, 255, 0.04)';
         for (const frac of [0.25, 0.50, 0.75]) {
             const y = h * frac;
             ctx.beginPath();
